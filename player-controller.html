@@ -71,9 +71,8 @@
     const playerId = urlParams.get('id') || 'p1';
     const roomId = urlParams.get('room') || 'default';
     
-    const syncTopic = 'farka-dnd-room-' + roomId + '/sync';
-    const actionTopic = 'farka-dnd-room-' + roomId + '/action';
-
+const syncTopic = 'campaign-dnd-room-' + roomId + '/sync';
+    const actionTopic = 'campaign-dnd-room-' + roomId + '/action';
     let sessionDataCache = null;
 
     // ==========================================

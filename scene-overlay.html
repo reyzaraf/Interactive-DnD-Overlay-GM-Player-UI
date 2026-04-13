@@ -33,9 +33,8 @@
     const urlParams = new URLSearchParams(window.location.search);
     const roomId = urlParams.get('room') || 'default';
     
-    const syncTopic = 'farka-dnd-room-' + roomId + '/sync';
-    const actionTopic = 'farka-dnd-room-' + roomId + '/action';
-
+    const syncTopic = 'campaign-dnd-room-' + roomId + '/sync';
+    const actionTopic = 'campaign-dnd-room-' + roomId + '/action';
     const client = mqtt.connect('wss://broker.hivemq.com:8000/mqtt');
 
     client.on('connect', () => {

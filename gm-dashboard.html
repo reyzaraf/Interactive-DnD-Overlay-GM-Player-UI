@@ -71,15 +71,16 @@
 
     <button class="btn-reset" onclick="resetAll()">Reset Semua Data</button>
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
 <script>
     const urlParams = new URLSearchParams(window.location.search);
     const roomId = urlParams.get('room') || 'default';
     const roomKey = 'dnd_session_' + roomId;
     const sceneKey = 'dnd_scene_' + roomId;
     
-    // Topik unik agar tidak bentrok dengan orang lain di server publik
-    const syncTopic = 'farka-dnd-room-' + roomId + '/sync';
-    const actionTopic = 'farka-dnd-room-' + roomId + '/action';
+    // Topik baru sesuai permintaanmu
+    const syncTopic = 'campaign-dnd-room-' + roomId + '/sync';
+    const actionTopic = 'campaign-dnd-room-' + roomId + '/action';
 
     const allConditions = ["Blinded", "Charmed", "Deafened", "Frightened", "Grappled", "Incapacitated", "Invisible", "Paralyzed", "Petrified", "Poisoned", "Prone", "Restrained", "Stunned", "Unconscious"];
 
@@ -89,50 +90,67 @@
     }));
 
     let sessionData = JSON.parse(localStorage.getItem(roomKey)) || defaultData;
-    sessionData = sessionData.map(p => ({ ...p, level: p.level || 1, conditions: p.conditions || [], initiative: p.initiative || 0, isTurn: p.isTurn || false, deathSaves: p.deathSaves || { success: 0, fail: 0 } }));
+    sessionData = sessionData.map(p => ({ 
+        ...p, 
+        level: p.level || 1, 
+        conditions: p.conditions || [], 
+        initiative: p.initiative || 0, 
+        isTurn: p.isTurn || false, 
+        deathSaves: p.deathSaves || { success: 0, fail: 0 } 
+    }));
 
-    document.querySelector('h1').innerHTML = `D&D GM Dashboard <br><span id="serverStatus" style="font-size: 1rem; color: #f39c12;">⏳ Menghubungkan ke Relay Server...</span>`;
+    const statusEl = document.getElementById('serverStatus');
 
     // ==========================================
-    // SISTEM PUBLIC MQTT (PENGGANTI FIREBASE & PEERJS)
+    // SISTEM PUBLIC MQTT (RECONNECT LOGIC)
     // ==========================================
+    
+    // Menggunakan broker publik HiveMQ via WebSockets
     const client = mqtt.connect('wss://broker.hivemq.com:8000/mqtt');
 
     client.on('connect', () => {
-        document.getElementById('serverStatus').innerHTML = `🌐 Sinyal Online (Room: ${roomId})`;
-        document.getElementById('serverStatus').style.color = '#2ecc71';
+        console.log('Terhubung ke MQTT Broker');
+        statusEl.innerHTML = `🌐 Sinyal Online (Room: ${roomId})`;
+        statusEl.style.color = '#2ecc71';
         
-        // Dengarkan aksi dari player
-        client.subscribe(actionTopic);
+        client.subscribe(actionTopic, (err) => {
+            if (!err) console.log('Subscribed to action topic');
+        });
         
-        // Langsung siarkan data saat GM pertama kali buka
         broadcastState();
     });
 
     client.on('message', (topic, message) => {
-        if (topic === actionTopic) {
+        try {
             const data = JSON.parse(message.toString());
-            
-            // Jika ada player/overlay yang baru masuk dan minta data
-            if (data.type === 'REQUEST_SYNC') {
-                broadcastState();
-            } 
-            // Jika player pencet tombol darah/death save
-            else if (data.type === 'ACTION') {
-                handlePlayerAction(data);
+            if (topic === actionTopic) {
+                if (data.type === 'REQUEST_SYNC') {
+                    broadcastState();
+                } else if (data.type === 'ACTION') {
+                    handlePlayerAction(data);
+                }
             }
+        } catch (e) {
+            console.error("Gagal memproses pesan:", e);
         }
     });
 
+    client.on('reconnect', () => {
+        statusEl.innerHTML = `🔄 Mencoba menyambung ulang...`;
+        statusEl.style.color = '#f39c12';
+    });
+
     client.on('error', (error) => {
-        document.getElementById('serverStatus').innerHTML = `❌ Terputus dari Relay Server`;
-        document.getElementById('serverStatus').style.color = '#e74c3c';
+        console.error('MQTT Error:', error);
+        statusEl.innerHTML = `❌ Gagal: Cek Koneksi Internet`;
+        statusEl.style.color = '#e74c3c';
     });
 
     function broadcastState() {
+        if (!client.connected) return;
         const sceneData = JSON.parse(localStorage.getItem(sceneKey)) || {title: '', subtitle: ''};
         const payload = JSON.stringify({ session: sessionData, scene: sceneData });
-        client.publish(syncTopic, payload);
+        client.publish(syncTopic, payload, { qos: 1 });
     }
 
     function handlePlayerAction(data) {
@@ -150,16 +168,17 @@
             if(data.saveType === 'fail' && sessionData[idx].deathSaves.fail < 3) sessionData[idx].deathSaves.fail++;
         }
         
-        // Simpan ke laptop GM, lalu otomatis siarkan ke semua layar
         saveData(); 
     }
+
     // ==========================================
 
     function updateSceneData() {
         const title = document.getElementById('sceneTitleInput').value;
         const sub = document.getElementById('sceneSubtitleInput').value;
         localStorage.setItem(sceneKey, JSON.stringify({ title: title, subtitle: sub }));
-        broadcastState(); alert("Scene diperbarui!");
+        broadcastState(); 
+        alert("Scene diperbarui!");
     }
 
     function clearSceneData() {
@@ -169,11 +188,14 @@
         broadcastState();
     }
 
-    function openSceneOverlay() { window.open(`scene-overlay.html?room=${roomId}`, '_blank'); }
+    function openSceneOverlay() { 
+        window.open(`scene-overlay.html?room=${roomId}`, '_blank'); 
+    }
+
     function copyPlayerLink(playerId) {
         const basePath = window.location.href.split('?')[0].replace('gm-dashboard.html', '');
         const link = `${basePath}player-controller.html?id=${playerId}&room=${roomId}`;
-        navigator.clipboard.writeText(link).then(() => alert(`Link disalin!`)).catch(() => alert(`Copy manual:\n${link}`));
+        navigator.clipboard.writeText(link).then(() => alert(`Link disalin!`));
     }
 
     const existingScene = JSON.parse(localStorage.getItem(sceneKey));
