@@ -7,17 +7,8 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Cormorant+Garamond:wght@600&display=swap');
         body { margin: 0; padding: 20px; background: transparent; overflow: hidden; display: flex; justify-content: center; }
-        .banner-container {
-            background: linear-gradient(145deg, #2a2118, #1a140f);
-            border: 3px solid #8b7348;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.9), inset 0 0 20px rgba(0,0,0,0.8);
-            border-radius: 4px; padding: 15px 40px; text-align: center;
-            min-width: 400px; position: relative;
-        }
-        .banner-container::before {
-            content: ''; position: absolute; top: -6px; left: -6px; right: -6px; bottom: -6px;
-            border: 1px solid #c5a059; pointer-events: none; opacity: 0.5;
-        }
+        .banner-container { background: linear-gradient(145deg, #2a2118, #1a140f); border: 3px solid #8b7348; box-shadow: 0 10px 30px rgba(0,0,0,0.9), inset 0 0 20px rgba(0,0,0,0.8); border-radius: 4px; padding: 15px 40px; text-align: center; min-width: 400px; position: relative; }
+        .banner-container::before { content: ''; position: absolute; top: -6px; left: -6px; right: -6px; bottom: -6px; border: 1px solid #c5a059; pointer-events: none; opacity: 0.5; }
         h1 { margin: 0; font-family: 'Cinzel', serif; font-size: 2rem; color: #d4af37; text-shadow: 2px 2px 4px #000; letter-spacing: 2px; }
         p { margin: 5px 0 0 0; font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; color: #e74c3c; font-weight: bold; }
         .hidden { display: none !important; }
@@ -30,37 +21,38 @@
     </div>
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const roomId = urlParams.get('room') || 'default';
-    
-    const syncTopic = 'campaign-dnd-room-' + roomId + '/sync';
-    const actionTopic = 'campaign-dnd-room-' + roomId + '/action';
-    const client = mqtt.connect('wss://broker.hivemq.com:8000/mqtt');
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomId = urlParams.get('room') || 'default';
+        const syncTopic = 'campaign-dnd-room-' + roomId + '/sync';
+        const actionTopic = 'campaign-dnd-room-' + roomId + '/action';
 
-    client.on('connect', () => {
-        client.subscribe(syncTopic);
-        // Teriak minta data scene ke GM
-        client.publish(actionTopic, JSON.stringify({ type: 'REQUEST_SYNC' }));
-    });
+        // Ganti ke Broker EMQX
+        const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
 
-    client.on('message', (topic, message) => {
-        if (topic === syncTopic) {
-            const data = JSON.parse(message.toString());
-            updateScene(data.scene);
+        client.on('connect', () => {
+            client.subscribe(syncTopic);
+            client.publish(actionTopic, JSON.stringify({ type: 'REQUEST_SYNC' }));
+        });
+
+        client.on('message', (topic, message) => {
+            if (topic === syncTopic) {
+                const data = JSON.parse(message.toString());
+                updateScene(data.scene);
+            }
+        });
+
+        function updateScene(data) {
+            const banner = document.getElementById('sceneBanner');
+            if (!data || (!data.title && !data.subtitle)) {
+                banner.classList.add('hidden');
+                return;
+            }
+            banner.classList.remove('hidden');
+            document.getElementById('sceneTitle').innerText = data.title;
+            document.getElementById('sceneSubtitle').innerText = data.subtitle;
         }
     });
-
-    function updateScene(data) {
-        const banner = document.getElementById('sceneBanner');
-        if (!data || (!data.title && !data.subtitle)) {
-            banner.classList.add('hidden');
-            return;
-        }
-        
-        banner.classList.remove('hidden');
-        document.getElementById('sceneTitle').innerText = data.title;
-        document.getElementById('sceneSubtitle').innerText = data.subtitle;
-    }
 </script>
 </body>
 </html>

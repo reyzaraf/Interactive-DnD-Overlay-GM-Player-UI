@@ -29,14 +29,17 @@
         /* Death Saves Controls */
         .death-controls { display: none; margin-top: 20px; }
         .is-dying .death-controls { display: block; }
-        .is-dying .controls-grid { display: none; } /* Hide HP buttons when dying */
+        .is-dying .controls-grid { display: none; }
         .ds-score { font-family: 'Cinzel', serif; font-size: 1.5rem; color: white; margin-bottom: 15px; display:flex; justify-content: space-around;}
         .btn-ds-succ { background: linear-gradient(to bottom, #2ecc71, #145a32); width:100%; border: 2px solid #2ecc71; margin-bottom:10px; }
         .btn-ds-fail { background: linear-gradient(to bottom, #000, #222); width:100%; border: 2px solid #555; }
+        
+        #errorMsg { display: none; color: #f39c12; font-family: 'Cinzel', serif; margin-bottom: 10px; }
     </style>
 </head>
 <body>
     <div class="remote-container" id="remoteController">
+        <div id="errorMsg">⏳ Menghubungkan...</div>
         <div class="turn-badge" id="turnBadge">🔥 GILIRANMU! 🔥</div>
         <div class="header"><h1 id="ctrlName">Loading...</h1><p>Lv. <span id="ctrlLevel">1</span> | AC <span id="ctrlAC">10</span></p></div>
 
@@ -65,89 +68,91 @@
             <p style="color:#888; font-size:0.8rem;">*GM yang bisa me-reset / memulihkan HP-mu</p>
         </div>
     </div>
+
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const playerId = urlParams.get('id') || 'p1';
-    const roomId = urlParams.get('room') || 'default';
-    
-const syncTopic = 'campaign-dnd-room-' + roomId + '/sync';
-    const actionTopic = 'campaign-dnd-room-' + roomId + '/action';
-    let sessionDataCache = null;
-
-    // ==========================================
-    // SISTEM PUBLIC MQTT (KLIEN PLAYER)
-    // ==========================================
-    const errorMsg = document.getElementById('errorMsg');
-    errorMsg.innerText = "⏳ Menghubungkan ke Relay (Room: " + roomId + ")...";
-    errorMsg.style.display = 'block';
-
-    const client = mqtt.connect('wss://broker.hivemq.com:8000/mqtt');
-
-    client.on('connect', () => {
-        errorMsg.style.display = 'none';
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const playerId = urlParams.get('id') || 'p1';
+        const roomId = urlParams.get('room') || 'default';
         
-        // Dengarkan siaran data dari GM
-        client.subscribe(syncTopic);
-        
-        // Teriak minta data pertama kali ke GM
-        client.publish(actionTopic, JSON.stringify({ type: 'REQUEST_SYNC' }));
-    });
+        const syncTopic = 'campaign-dnd-room-' + roomId + '/sync';
+        const actionTopic = 'campaign-dnd-room-' + roomId + '/action';
+        let sessionDataCache = null;
 
-    client.on('message', (topic, message) => {
-        if (topic === syncTopic) {
-            const data = JSON.parse(message.toString());
-            sessionDataCache = data.session;
-            updateUI();
+        const errorEl = document.getElementById('errorMsg');
+        errorEl.style.display = 'block';
+        errorEl.innerText = "⏳ Menghubungkan ke Relay EMQX...";
+
+        // Ganti ke Broker EMQX agar sama dengan GM Dashboard
+        const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+
+        client.on('connect', () => {
+            errorEl.style.display = 'none';
+            client.subscribe(syncTopic);
+            client.publish(actionTopic, JSON.stringify({ type: 'REQUEST_SYNC' }));
+        });
+
+        client.on('message', (topic, message) => {
+            if (topic === syncTopic) {
+                const data = JSON.parse(message.toString());
+                sessionDataCache = data.session;
+                updateUI();
+            }
+        });
+
+        client.on('error', () => {
+            errorEl.innerText = "❌ Koneksi Relay terputus!";
+            errorEl.style.display = 'block';
+        });
+
+        function updateUI() {
+            if(!sessionDataCache) return;
+            const player = sessionDataCache.find(p => p.id === playerId);
+            if (!player || !player.active) { 
+                document.getElementById('remoteController').innerHTML = "<h2 style='color:red;'>Player Tidak Aktif / Tunggu GM buka Dashboard</h2>"; 
+                return; 
+            }
+
+            document.getElementById('ctrlName').innerText = player.name;
+            document.getElementById('ctrlLevel').innerText = player.level;
+            document.getElementById('ctrlAC').innerText = player.ac;
+            document.getElementById('ctrlCurrentHP').innerText = player.hp;
+            document.getElementById('ctrlMaxHP').innerText = player.maxHp;
+            
+            document.getElementById('turnBadge').style.display = player.isTurn ? 'inline-block' : 'none';
+
+            if (player.conditions && player.conditions.length > 0) document.getElementById('ctrlConditions').innerText = "Kondisi: " + player.conditions.join(', ');
+            else document.getElementById('ctrlConditions').innerText = "Kondisi: Normal";
+
+            const remote = document.getElementById('remoteController');
+            if (player.hp <= 0 && player.maxHp > 0) {
+                remote.classList.add('is-dying');
+                document.getElementById('hpLabel').innerText = "💀 STATUS SEKARAT 💀";
+                document.getElementById('dsSuccScore').innerText = player.deathSaves.success;
+                document.getElementById('dsFailScore').innerText = player.deathSaves.fail;
+            } else {
+                remote.classList.remove('is-dying');
+                document.getElementById('hpLabel').innerText = "Current HP";
+            }
         }
+
+        window.modifyHP = function(amount) {
+            if (client.connected) {
+                client.publish(actionTopic, JSON.stringify({ 
+                    type: 'ACTION', action: 'MODIFY_HP', playerId: playerId, amount: amount 
+                }));
+            }
+        };
+
+        window.addDeathSave = function(type) {
+            if (client.connected) {
+                client.publish(actionTopic, JSON.stringify({ 
+                    type: 'ACTION', action: 'DEATH_SAVE', playerId: playerId, saveType: type 
+                }));
+            }
+        };
     });
-
-    client.on('error', () => {
-        errorMsg.innerText = "❌ Koneksi Relay terputus!";
-        errorMsg.style.display = 'block';
-    });
-    // ==========================================
-
-    function updateUI() {
-        if(!sessionDataCache) return;
-        const player = sessionDataCache.find(p => p.id === playerId);
-        if (!player || !player.active) { document.body.innerHTML = "<h2 style='color:red;'>Player Tidak Aktif / Tunggu GM buka Dashboard</h2>"; return; }
-
-        document.getElementById('ctrlName').innerText = player.name;
-        document.getElementById('ctrlLevel').innerText = player.level;
-        document.getElementById('ctrlAC').innerText = player.ac;
-        document.getElementById('ctrlCurrentHP').innerText = player.hp;
-        document.getElementById('ctrlMaxHP').innerText = player.maxHp;
-        
-        document.getElementById('turnBadge').style.display = player.isTurn ? 'inline-block' : 'none';
-
-        if (player.conditions && player.conditions.length > 0) document.getElementById('ctrlConditions').innerText = "Kondisi: " + player.conditions.join(', ');
-        else document.getElementById('ctrlConditions').innerText = "Kondisi: Normal";
-
-        const remote = document.getElementById('remoteController');
-        if (player.hp <= 0 && player.maxHp > 0) {
-            remote.classList.add('is-dying');
-            document.getElementById('hpLabel').innerText = "💀 STATUS SEKARAT 💀";
-            document.getElementById('dsSuccScore').innerText = player.deathSaves.success;
-            document.getElementById('dsFailScore').innerText = player.deathSaves.fail;
-        } else {
-            remote.classList.remove('is-dying');
-            document.getElementById('hpLabel').innerText = "Current HP";
-        }
-    }
-
-    // Mengirim Aksi ke GM
-    function modifyHP(amount) {
-        client.publish(actionTopic, JSON.stringify({ 
-            type: 'ACTION', action: 'MODIFY_HP', playerId: playerId, amount: amount 
-        }));
-    }
-
-    function addDeathSave(type) {
-        client.publish(actionTopic, JSON.stringify({ 
-            type: 'ACTION', action: 'DEATH_SAVE', playerId: playerId, saveType: type 
-        }));
-    }
 </script>
 </body>
 </html>
