@@ -73,84 +73,60 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const urlParams = new URLSearchParams(window.location.search);
-        const playerId = urlParams.get('id') || 'p1';
         const roomId = urlParams.get('room') || 'default';
-        
+        const key = urlParams.get('key') || '';
+        const myPin = atob(key); // Decode PIN
+        const playerId = urlParams.get('id') || 'p1';
+
         const syncTopic = 'campaign-dnd-room-' + roomId + '/sync';
         const actionTopic = 'campaign-dnd-room-' + roomId + '/action';
+
+        const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
         let sessionDataCache = null;
 
-        const errorEl = document.getElementById('errorMsg');
-        errorEl.style.display = 'block';
-        errorEl.innerText = "⏳ Menghubungkan ke Relay EMQX...";
-
-        // Ganti ke Broker EMQX agar sama dengan GM Dashboard
-        const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
-
         client.on('connect', () => {
-            errorEl.style.display = 'none';
             client.subscribe(syncTopic);
-            client.publish(actionTopic, JSON.stringify({ type: 'REQUEST_SYNC' }));
+            // Kirim request sync yang menyertakan PIN
+            client.publish(actionTopic, JSON.stringify({ type: 'REQUEST_SYNC', pin: myPin }));
         });
 
         client.on('message', (topic, message) => {
-            if (topic === syncTopic) {
-                const data = JSON.parse(message.toString());
-                sessionDataCache = data.session;
-                updateUI();
+            const data = JSON.parse(message.toString());
+            // VALIDASI: Hanya terima data jika PIN dari GM cocok dengan link kita
+            if (data.pin !== myPin) {
+                document.body.innerHTML = "<h2 style='color:red; text-align:center;'>❌ AKSES DITOLAK: PIN SALAH / LINK TIDAK VALID</h2>";
+                return;
             }
-        });
-
-        client.on('error', () => {
-            errorEl.innerText = "❌ Koneksi Relay terputus!";
-            errorEl.style.display = 'block';
+            sessionDataCache = data.session;
+            updateUI();
         });
 
         function updateUI() {
-            if(!sessionDataCache) return;
             const player = sessionDataCache.find(p => p.id === playerId);
-            if (!player || !player.active) { 
-                document.getElementById('remoteController').innerHTML = "<h2 style='color:red;'>Player Tidak Aktif / Tunggu GM buka Dashboard</h2>"; 
-                return; 
-            }
-
+            if (!player || !player.active) return;
             document.getElementById('ctrlName').innerText = player.name;
-            document.getElementById('ctrlLevel').innerText = player.level;
-            document.getElementById('ctrlAC').innerText = player.ac;
             document.getElementById('ctrlCurrentHP').innerText = player.hp;
             document.getElementById('ctrlMaxHP').innerText = player.maxHp;
+            document.getElementById('ctrlAC').innerText = player.ac;
+            document.getElementById('ctrlLevel').innerText = player.level;
+            document.getElementById('turnBadge').style.display = player.isTurn ? 'block' : 'none';
             
-            document.getElementById('turnBadge').style.display = player.isTurn ? 'inline-block' : 'none';
-
-            if (player.conditions && player.conditions.length > 0) document.getElementById('ctrlConditions').innerText = "Kondisi: " + player.conditions.join(', ');
-            else document.getElementById('ctrlConditions').innerText = "Kondisi: Normal";
-
             const remote = document.getElementById('remoteController');
-            if (player.hp <= 0 && player.maxHp > 0) {
+            if (player.hp <= 0) {
                 remote.classList.add('is-dying');
-                document.getElementById('hpLabel').innerText = "💀 STATUS SEKARAT 💀";
                 document.getElementById('dsSuccScore').innerText = player.deathSaves.success;
                 document.getElementById('dsFailScore').innerText = player.deathSaves.fail;
             } else {
                 remote.classList.remove('is-dying');
-                document.getElementById('hpLabel').innerText = "Current HP";
             }
         }
 
-        window.modifyHP = function(amount) {
-            if (client.connected) {
-                client.publish(actionTopic, JSON.stringify({ 
-                    type: 'ACTION', action: 'MODIFY_HP', playerId: playerId, amount: amount 
-                }));
-            }
+        window.modifyHP = function(amt) {
+            client.publish(actionTopic, JSON.stringify({ type: 'ACTION', action: 'MODIFY_HP', playerId, amount: amt, pin: myPin }));
         };
 
         window.addDeathSave = function(type) {
-            if (client.connected) {
-                client.publish(actionTopic, JSON.stringify({ 
-                    type: 'ACTION', action: 'DEATH_SAVE', playerId: playerId, saveType: type 
-                }));
-            }
+            client.publish(actionTopic, JSON.stringify({ type: 'ACTION', action: 'DEATH_SAVE', playerId, saveType: type, pin: myPin }));
         };
     });
 </script>

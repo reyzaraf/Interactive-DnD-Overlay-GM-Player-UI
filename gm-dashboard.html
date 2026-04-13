@@ -71,244 +71,141 @@
 
     <button class="btn-reset" onclick="resetAll()">Reset Semua Data</button>
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-
 <script>
-    // Membungkus kode dalam event DOMContentLoaded agar element HTML terbaca dulu
     document.addEventListener('DOMContentLoaded', function() {
         const urlParams = new URLSearchParams(window.location.search);
         const roomId = urlParams.get('room') || 'default';
-        const roomKey = 'dnd_session_' + roomId;
-        const sceneKey = 'dnd_scene_' + roomId;
+        const key = urlParams.get('key') || ''; 
+        const myPin = atob(key);
         
         const syncTopic = 'campaign-dnd-room-' + roomId + '/sync';
         const actionTopic = 'campaign-dnd-room-' + roomId + '/action';
+        const guardTopic = 'campaign-dnd-room-' + roomId + '/guard';
 
-        const allConditions = ["Blinded", "Charmed", "Deafened", "Frightened", "Grappled", "Incapacitated", "Invisible", "Paralyzed", "Petrified", "Poisoned", "Prone", "Restrained", "Stunned", "Unconscious"];
-
-        const defaultData = Array.from({length: 10}, (_, i) => ({
-            id: `p${i+1}`, active: i < 4, name: `Player ${i+1}`, className: "Class", level: 1, ac: 10, hp: 20, maxHp: 20,
-            conditions: [], initiative: 0, isTurn: false, deathSaves: { success: 0, fail: 0 }
-        }));
-
-        let sessionData = JSON.parse(localStorage.getItem(roomKey)) || defaultData;
-        sessionData = sessionData.map(p => ({ 
-            ...p, level: p.level || 1, conditions: p.conditions || [], initiative: p.initiative || 0, isTurn: p.isTurn || false, deathSaves: p.deathSaves || { success: 0, fail: 0 } 
-        }));
-
-        // Pastikan element serverStatus sudah ada sebelum diakses
-        const statusEl = document.getElementById('serverStatus');
-        const h1El = document.querySelector('h1');
-        if (h1El) h1El.innerHTML = `D&D GM Dashboard <br><span id="serverStatus" style="font-size: 1rem; color: #f39c12;">⏳ Menghubungkan ke Relay Server...</span>`;
-
-        // ==========================================
-        // SISTEM PUBLIC MQTT (BROKER ALTERNATIF)
-        // ==========================================
-        
-        // Kita ganti ke broker EMQX (biasanya lebih stabil untuk websocket)
         const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+        let isRoomOwner = false;
+        const instanceId = Math.random().toString(36).substr(2, 9);
 
+        // --- SISTEM GUARDING ---
         client.on('connect', () => {
-            console.log('Terhubung ke EMQX Broker');
-            const statusUpdate = document.getElementById('serverStatus');
-            if (statusUpdate) {
-                statusUpdate.innerHTML = `🌐 Sinyal Online (Room: ${roomId})`;
-                statusUpdate.style.color = '#2ecc71';
-            }
+            client.subscribe(guardTopic);
             client.subscribe(actionTopic);
-            broadcastState();
+            // Kirim cek apakah ada GM lain
+            client.publish(guardTopic, JSON.stringify({ type: 'PING', id: instanceId }));
+            
+            // Tunggu sebentar, jika tidak ada balasan PONG, maka kita pemilik room
+            setTimeout(() => {
+                if (!isRoomOwner) {
+                    isRoomOwner = true;
+                    initDashboard();
+                }
+            }, 1500);
         });
 
         client.on('message', (topic, message) => {
-            try {
-                const data = JSON.parse(message.toString());
-                if (topic === actionTopic) {
-                    if (data.type === 'REQUEST_SYNC') {
-                        broadcastState();
-                    } else if (data.type === 'ACTION') {
-                        handlePlayerAction(data);
-                    }
+            const data = JSON.parse(message.toString());
+            if (topic === guardTopic) {
+                if (data.type === 'PING' && data.id !== instanceId && isRoomOwner) {
+                    // Jika ada yang baru masuk, beri tahu kita pemiliknya
+                    client.publish(guardTopic, JSON.stringify({ type: 'PONG', id: instanceId }));
+                } else if (data.type === 'PONG' && data.id !== instanceId) {
+                    // Jika kita baru masuk dan ada yang balas PONG, berarti room terpakai
+                    alert("ROOM SEDANG TERPAKAI! Gunakan nama room lain untuk sesi baru.");
+                    window.location.href = 'index.html';
                 }
-            } catch (e) {
-                console.error("Gagal memproses pesan:", e);
+            }
+            if (topic === actionTopic && isRoomOwner) {
+                if (data.pin !== myPin) return; // ABAIKAN JIKA PIN SALAH (Anti-Iseng)
+                if (data.type === 'REQUEST_SYNC') broadcastState();
+                else if (data.type === 'ACTION') handlePlayerAction(data);
             }
         });
 
-        client.on('reconnect', () => {
-            const statusUpdate = document.getElementById('serverStatus');
-            if (statusUpdate) {
-                statusUpdate.innerHTML = `🔄 Mencoba menyambung ulang...`;
-                statusUpdate.style.color = '#f39c12';
-            }
-        });
+        // --- LOGIKA DASHBOARD ASLI (DIBUNGKUS) ---
+        let sessionData = [];
+        const roomKey = 'dnd_session_' + roomId;
+        const sceneKey = 'dnd_scene_' + roomId;
 
-        client.on('error', (error) => {
-            const statusUpdate = document.getElementById('serverStatus');
-            if (statusUpdate) {
-                statusUpdate.innerHTML = `❌ Gagal: Cek Koneksi Internet`;
-                statusUpdate.style.color = '#e74c3c';
-            }
-        });
+        function initDashboard() {
+            document.getElementById('serverStatus').innerHTML = `🌐 Sinyal Online (Room: ${roomId})`;
+            document.getElementById('serverStatus').style.color = '#2ecc71';
+            
+            const defaultData = Array.from({length: 10}, (_, i) => ({
+                id: `p${i+1}`, active: i < 4, name: `Player ${i+1}`, className: "Class", level: 1, ac: 10, hp: 20, maxHp: 20,
+                conditions: [], initiative: 0, isTurn: false, deathSaves: { success: 0, fail: 0 }
+            }));
+            sessionData = JSON.parse(localStorage.getItem(roomKey)) || defaultData;
+            sessionData = sessionData.map(p => ({...p, deathSaves: p.deathSaves || {success:0, fail:0}}));
+            renderDashboard();
+            broadcastState();
+        }
 
         function broadcastState() {
-            if (!client.connected) return;
+            if (!client.connected || !isRoomOwner) return;
             const sceneData = JSON.parse(localStorage.getItem(sceneKey)) || {title: '', subtitle: ''};
-            const payload = JSON.stringify({ session: sessionData, scene: sceneData });
-            client.publish(syncTopic, payload, { qos: 0, retain: true });
+            client.publish(syncTopic, JSON.stringify({ session: sessionData, scene: sceneData, pin: myPin }), { retain: true });
         }
+
+        // Ekspos fungsi ke Global agar tombol onclick jalan
+        window.modifyHP = function(index, amount) {
+            sessionData[index].hp = Math.min(Math.max(sessionData[index].hp + amount, 0), sessionData[index].maxHp);
+            if (sessionData[index].hp > 0) sessionData[index].deathSaves = {success:0, fail:0};
+            saveData();
+        };
+
+        window.updateData = function(i, k, v) { sessionData[i][k] = (typeof sessionData[i][k] === 'number') ? parseInt(v) || 0 : v; saveData(); };
+        window.updateConditions = function(i, s) { sessionData[i].conditions = Array.from(s.selectedOptions).map(o => o.value); saveData(); };
+        window.clearConditions = function(i) { sessionData[i].conditions = []; saveData(); };
+        window.sortInitiative = function() { sessionData.sort((a,b) => b.initiative - a.initiative); saveData(); };
+        window.nextTurn = function() {
+            let cur = sessionData.findIndex(p => p.isTurn && p.active);
+            sessionData.forEach(p => p.isTurn = false);
+            let next = (cur + 1) % sessionData.length;
+            while (!sessionData[next].active && next !== cur) next = (next + 1) % sessionData.length;
+            sessionData[next].isTurn = true; saveData();
+        };
+        window.togglePlayer = function(i) { sessionData[i].active = !sessionData[i].active; saveData(); };
+        window.updateSceneData = function() {
+            const t = document.getElementById('sceneTitleInput').value;
+            const s = document.getElementById('sceneSubtitleInput').value;
+            localStorage.setItem(sceneKey, JSON.stringify({title:t, subtitle:s})); broadcastState(); alert("Scene Update!");
+        };
+        window.clearSceneData = function() { document.getElementById('sceneTitleInput').value = ''; document.getElementById('sceneSubtitleInput').value = ''; localStorage.setItem(sceneKey, JSON.stringify({title:'', subtitle:''})); broadcastState(); };
+        window.openSceneOverlay = function() { window.open(`scene-overlay.html?room=${roomId}&key=${key}`, '_blank'); };
+        window.copyPlayerLink = function(pid) {
+            const base = window.location.href.split('?')[0].replace('gm-dashboard.html', '');
+            navigator.clipboard.writeText(`${base}player-controller.html?id=${pid}&room=${roomId}&key=${key}`).then(() => alert("Link Copy!"));
+        };
 
         function handlePlayerAction(data) {
             const idx = sessionData.findIndex(p => p.id === data.playerId);
-            if(idx === -1) return;
-
-            if (data.action === 'MODIFY_HP') {
-                let newHP = sessionData[idx].hp + data.amount;
-                if (newHP < 0) newHP = 0;
-                if (newHP > sessionData[idx].maxHp) newHP = sessionData[idx].maxHp;
-                sessionData[idx].hp = newHP;
-                if (newHP > 0) sessionData[idx].deathSaves = { success: 0, fail: 0 };
-            } else if (data.action === 'DEATH_SAVE') {
-                if(data.saveType === 'success' && sessionData[idx].deathSaves.success < 3) sessionData[idx].deathSaves.success++;
-                if(data.saveType === 'fail' && sessionData[idx].deathSaves.fail < 3) sessionData[idx].deathSaves.fail++;
+            if (idx === -1) return;
+            if (data.action === 'MODIFY_HP') window.modifyHP(idx, data.amount);
+            else if (data.action === 'DEATH_SAVE') {
+                if (data.saveType === 'success') sessionData[idx].deathSaves.success = Math.min(sessionData[idx].deathSaves.success + 1, 3);
+                else sessionData[idx].deathSaves.fail = Math.min(sessionData[idx].deathSaves.fail + 1, 3);
+                saveData();
             }
-            saveData(); 
         }
-
-        // Ekspos fungsi ke global window agar tombol HTML tetap bisa panggil
-        window.updateData = function(index, key, value) {
-            sessionData[index][key] = (key === 'ac' || key === 'hp' || key === 'maxHp' || key === 'level' || key === 'initiative') ? parseInt(value) || 0 : value;
-            if (key === 'hp' && sessionData[index].hp > 0) sessionData[index].deathSaves = { success: 0, fail: 0 };
-            saveData(); 
-        };
-
-        window.updateConditions = function(index, selectElement) {
-            sessionData[index].conditions = Array.from(selectElement.selectedOptions).map(opt => opt.value);
-            saveData();
-        };
-
-        window.clearConditions = function(index) {
-            sessionData[index].conditions = [];
-            saveData();
-        };
-
-        window.modifyHP = function(index, amount) {
-            let newHP = sessionData[index].hp + amount;
-            if (newHP < 0) newHP = 0;
-            if (newHP > sessionData[index].maxHp) newHP = sessionData[index].maxHp;
-            sessionData[index].hp = newHP;
-            if (newHP > 0) sessionData[index].deathSaves = { success: 0, fail: 0 };
-            saveData();
-        };
-
-        window.sortInitiative = function() {
-            sessionData.sort((a, b) => b.initiative - a.initiative);
-            saveData();
-        };
-
-        window.nextTurn = function() {
-            let currentIndex = sessionData.findIndex(p => p.isTurn && p.active);
-            sessionData.forEach(p => p.isTurn = false);
-            let nextIndex = currentIndex + 1;
-            let found = false;
-            for(let i=0; i<sessionData.length; i++) {
-                if(nextIndex >= sessionData.length) nextIndex = 0;
-                if(sessionData[nextIndex].active && sessionData[nextIndex].hp > 0) {
-                    sessionData[nextIndex].isTurn = true; found = true; break;
-                }
-                nextIndex++;
-            }
-            if(!found && sessionData.filter(p=>p.active).length > 0) sessionData[0].isTurn = true;
-            saveData();
-        };
-
-        window.togglePlayer = function(index) { sessionData[index].active = !sessionData[index].active; saveData(); };
+        function saveData() { localStorage.setItem(roomKey, JSON.stringify(sessionData)); broadcastState(); renderDashboard(); }
         
-        window.resetAll = function() { 
-            if(confirm("Reset Room " + roomId + "?")) { 
-                sessionData = JSON.parse(JSON.stringify(defaultData)); 
-                saveData(); 
-            } 
-        };
-
-        window.updateSceneData = function() {
-            const title = document.getElementById('sceneTitleInput').value;
-            const sub = document.getElementById('sceneSubtitleInput').value;
-            localStorage.setItem(sceneKey, JSON.stringify({ title: title, subtitle: sub }));
-            broadcastState(); 
-            alert("Scene diperbarui!");
-        };
-
-        window.clearSceneData = function() {
-            document.getElementById('sceneTitleInput').value = '';
-            document.getElementById('sceneSubtitleInput').value = '';
-            localStorage.setItem(sceneKey, JSON.stringify({ title: '', subtitle: '' }));
-            broadcastState();
-        };
-
-        window.openSceneOverlay = function() { window.open(`scene-overlay.html?room=${roomId}`, '_blank'); };
-        
-        window.copyPlayerLink = function(playerId) {
-            const basePath = window.location.href.split('?')[0].replace('gm-dashboard.html', '');
-            const link = `${basePath}player-controller.html?id=${playerId}&room=${roomId}`;
-            navigator.clipboard.writeText(link).then(() => alert(`Link disalin!`));
-        };
-
-        function saveData() { 
-            localStorage.setItem(roomKey, JSON.stringify(sessionData)); 
-            broadcastState(); 
-            renderDashboard(); 
-        }
-
         function renderDashboard() {
-            const grid = document.getElementById('gmGrid');
-            if (!grid) return;
-            grid.innerHTML = '';
-
-            sessionData.forEach((player, index) => {
+            const grid = document.getElementById('gmGrid'); if (!grid) return; grid.innerHTML = '';
+            sessionData.forEach((p, i) => {
                 const card = document.createElement('div');
-                card.className = `player-card ${player.active ? '' : 'inactive'} ${player.isTurn ? 'is-turn' : ''}`;
-                
-                let conditionOptions = allConditions.map(cond => `<option value="${cond}" ${player.conditions.includes(cond) ? 'selected' : ''}>${cond}</option>`).join('');
-
-                let hpSectionHTML = '';
-                if (player.hp <= 0 && player.maxHp > 0) {
-                    hpSectionHTML = `<div class="death-saves-panel"><p>💀 SEKARAT</p>Sukses: ${player.deathSaves.success} | Gagal: ${player.deathSaves.fail}<br><button class="btn-heal" style="margin-top:5px; padding: 4px;" onclick="modifyHP(${index}, 1)">Heal</button></div>`;
-                } else {
-                    hpSectionHTML = `<div class="hp-controls"><button class="btn-dmg" onclick="modifyHP(${index}, -5)">-5</button><button class="btn-dmg" onclick="modifyHP(${index}, -1)">-1</button><button class="btn-heal" onclick="modifyHP(${index}, 1)">+1</button><button class="btn-heal" onclick="modifyHP(${index}, 5)">+5</button></div>`;
-                }
-
-                card.innerHTML = `
-                    <div style="position: absolute; top: 10px; right: 10px; background: #110d0a; border: 1px solid var(--gold-dark); padding: 2px 6px; border-radius: 4px; font-family: 'Cinzel', serif; font-size: 0.8rem; color: var(--gold-light);">ID: ${player.id}</div>
-                    <h3>${player.isTurn ? '⚔️ ' : ''}Slot ${index + 1}</h3>
-                    <div style="display:flex; gap:10px;">
-                        <div style="flex:1;">
-                            <div class="form-group"><label>Nama</label><input type="text" value="${player.name}" onchange="updateData(${index}, 'name', this.value)" ${!player.active ? 'disabled' : ''}></div>
-                            <div class="form-group"><label>Class</label><input type="text" value="${player.className}" onchange="updateData(${index}, 'className', this.value)" ${!player.active ? 'disabled' : ''}></div>
-                            <div class="form-group"><label>Level</label><input type="number" value="${player.level}" onchange="updateData(${index}, 'level', this.value)" ${!player.active ? 'disabled' : ''}></div>
-                        </div>
-                        <div style="flex:1;">
-                            <div class="form-group"><label>AC</label><input type="number" value="${player.ac}" onchange="updateData(${index}, 'ac', this.value)" ${!player.active ? 'disabled' : ''}></div>
-                            <div class="form-group"><label>Inisiatif</label><input type="number" value="${player.initiative}" onchange="updateData(${index}, 'initiative', this.value)" ${!player.active ? 'disabled' : ''} style="border-color:#3498db;"></div>
-                            <div class="form-group"><label>Max HP</label><input type="number" value="${player.maxHp}" onchange="updateData(${index}, 'maxHp', this.value)" ${!player.active ? 'disabled' : ''}></div>
-                        </div>
-                    </div>
-                    <div class="form-group"><label>Curr HP</label><input type="number" value="${player.hp}" onchange="updateData(${index}, 'hp', this.value)" ${!player.active ? 'disabled' : ''} style="color: ${player.hp <= 0 ? '#e74c3c' : '#d4af37'};"></div>
-                    <div class="form-group" style="align-items: flex-start;"><label style="margin-top: 5px;">Kondisi</label><div class="condition-container"><select multiple onchange="updateConditions(${index}, this)" ${!player.active ? 'disabled' : ''}>${conditionOptions}</select><button class="btn-clear-cond" onclick="clearConditions(${index})" ${!player.active ? 'disabled' : ''}>Set Normal</button></div></div>
-                    ${hpSectionHTML}
-                    <button class="btn-overlay" onclick="window.open('player-overlay.html?id=${player.id}&room=${roomId}', '_blank')" ${!player.active ? 'disabled' : ''}>Buka Overlay Stream</button>
-                    <button class="btn-copy" onclick="copyPlayerLink('${player.id}')" ${!player.active ? 'disabled' : ''}>🔗 Copy Link Player Controller</button>
-                    <button class="btn-toggle" onclick="togglePlayer(${index})">${player.active ? 'Nonaktifkan Player' : 'Aktifkan Player'}</button>
-                `;
+                card.className = `player-card ${p.active ? '' : 'inactive'} ${p.isTurn ? 'is-turn' : ''}`;
+                let hpUI = p.hp <= 0 ? `<div class="death-saves-panel"><p>💀 SEKARAT</p>${p.deathSaves.success}/3 Succ | ${p.deathSaves.fail}/3 Fail<br><button onclick="modifyHP(${i}, 1)">Heal</button></div>` : 
+                                       `<div class="hp-controls"><button onclick="modifyHP(${i},-5)">-5</button><button onclick="modifyHP(${i},-1)">-1</button><button onclick="modifyHP(${i},1)">+1</button><button onclick="modifyHP(${i},5)">+5</button></div>`;
+                card.innerHTML = `<h3>${p.name} (Lv.${p.level})</h3>
+                    <div class="form-group"><label>HP</label><input type="number" value="${p.hp}" onchange="updateData(${i},'hp',this.value)"></div>
+                    <div class="form-group"><label>AC</label><input type="number" value="${p.ac}" onchange="updateData(${i},'ac',this.value)"></div>
+                    <div class="form-group"><label>Init</label><input type="number" value="${p.initiative}" onchange="updateData(${i},'initiative',this.value)"></div>
+                    ${hpUI}
+                    <button class="btn-copy" onclick="copyPlayerLink('${p.id}')">🔗 Copy Link</button>
+                    <button class="btn-toggle" onclick="togglePlayer(${i})">${p.active ? 'Matikan' : 'Aktifkan'}</button>`;
                 grid.appendChild(card);
             });
         }
-
-        // Render pertama kali saat load
-        const existingSceneData = JSON.parse(localStorage.getItem(sceneKey));
-        if(existingSceneData) {
-            document.getElementById('sceneTitleInput').value = existingSceneData.title || '';
-            document.getElementById('sceneSubtitleInput').value = existingSceneData.subtitle || '';
-        }
-        renderDashboard();
     });
 </script>
 </body>

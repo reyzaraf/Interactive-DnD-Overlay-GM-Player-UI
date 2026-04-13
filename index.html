@@ -6,236 +6,60 @@
     <title>D&D Stream Tracker - Portal</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Cormorant+Garamond:wght@600&display=swap');
-
-        :root {
-            --gold-light: #d4af37;
-            --gold-dark: #8b7348;
-            --bg-texture: linear-gradient(135deg, #1c140d 0%, #0a0705 100%);
-            --panel-bg: linear-gradient(145deg, #2a2118, #1a140f);
-        }
-
-        body {
-            font-family: 'Cormorant Garamond', serif;
-            background: var(--bg-texture);
-            color: #dcdde1;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-
-        .portal-container {
-            background: var(--panel-bg);
-            width: 100%;
-            max-width: 500px;
-            border-radius: 8px;
-            padding: 40px 30px;
-            border: 3px solid #5c4a2e;
-            border-top-color: var(--gold-dark);
-            border-left-color: var(--gold-dark);
-            box-shadow: 0 15px 40px rgba(0,0,0,0.9), inset 0 0 30px rgba(0,0,0,0.8);
-            text-align: center;
-            position: relative;
-        }
-
-        .portal-container::before {
-            content: '';
-            position: absolute;
-            top: -8px; left: -8px; right: -8px; bottom: -8px;
-            border: 2px solid var(--gold-dark);
-            pointer-events: none;
-            opacity: 0.4;
-        }
-
-        .header h1 {
-            margin: 0;
-            color: var(--gold-light);
-            font-family: 'Cinzel', serif;
-            font-size: 2.8rem;
-            text-shadow: 2px 2px 5px #000;
-            border-bottom: 2px solid var(--gold-dark);
-            padding-bottom: 15px;
-            margin-bottom: 20px;
-        }
-
-        .header p {
-            color: #bdc3c7;
-            font-size: 1.2rem;
-            font-style: italic;
-            margin-bottom: 30px;
-        }
-
-        .input-group {
-            margin-bottom: 25px;
-            text-align: left;
-        }
-
-        .input-group label {
-            display: block;
-            font-family: 'Cinzel', serif;
-            color: var(--gold-light);
-            font-size: 1.1rem;
-            margin-bottom: 8px;
-            text-shadow: 1px 1px 2px #000;
-        }
-
-        .input-group input {
-            width: 100%;
-            padding: 15px;
-            background: #110d0a;
-            border: 2px solid var(--gold-dark);
-            color: #fff;
-            border-radius: 6px;
-            font-family: 'Segoe UI', Tahoma, sans-serif;
-            font-size: 1.2rem;
-            box-sizing: border-box;
-            box-shadow: inset 0 4px 8px rgba(0,0,0,0.8);
-            transition: all 0.3s;
-        }
-
-        .input-group input:focus {
-            outline: none;
-            border-color: var(--gold-light);
-            box-shadow: 0 0 10px rgba(212, 175, 55, 0.5), inset 0 4px 8px rgba(0,0,0,0.8);
-        }
-
-        .btn-enter {
-            width: 100%;
-            padding: 18px;
-            font-size: 1.5rem;
-            font-family: 'Cinzel', serif;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: pointer;
-            color: white;
-            background: linear-gradient(to bottom, #1e5631, #0a2e15);
-            border: 2px solid #4caf50;
-            text-shadow: 1px 1px 3px #000;
-            box-shadow: 0 6px 15px rgba(0,0,0,0.7), inset 0 2px 5px rgba(255,255,255,0.2);
-            transition: transform 0.1s, filter 0.2s;
-            margin-bottom: 20px;
-        }
-
-        .btn-enter:hover {
-            filter: brightness(1.2);
-        }
-
-        .btn-enter:active {
-            transform: translateY(4px);
-            box-shadow: 0 2px 6px rgba(0,0,0,0.7), inset 0 2px 5px rgba(0,0,0,0.5);
-        }
-
-        /* Area Link Generator yang muncul setelah ngetik */
-        #linkGenerator {
-            display: none;
-            background: rgba(0,0,0,0.6);
-            padding: 15px;
-            border-radius: 6px;
-            border: 1px dashed var(--gold-dark);
-            text-align: left;
-            margin-top: 20px;
-        }
-
-        #linkGenerator h3 {
-            font-family: 'Cinzel', serif;
-            color: var(--gold-light);
-            margin-top: 0;
-            font-size: 1rem;
-            border-bottom: 1px solid #3d2e18;
-            padding-bottom: 5px;
-        }
-
-        .link-item {
-            margin-bottom: 10px;
-            font-family: monospace;
-            font-size: 0.85rem;
-            color: #bdc3c7;
-            background: #000;
-            padding: 8px;
-            border-radius: 4px;
-            word-break: break-all;
-            user-select: all; /* Gampang di-copy */
-        }
-
-        .note {
-            font-size: 0.9rem;
-            color: #7f8c8d;
-            margin-top: 20px;
-            font-style: italic;
-        }
-
+        :root { --gold-light: #d4af37; --gold-dark: #8b7348; --bg-texture: linear-gradient(135deg, #1c140d 0%, #0a0705 100%); --panel-bg: linear-gradient(145deg, #2a2118, #1a140f); }
+        body { font-family: 'Cormorant Garamond', serif; background: var(--bg-texture); color: #dcdde1; margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .portal-container { background: var(--panel-bg); width: 100%; max-width: 500px; border-radius: 8px; padding: 40px 30px; border: 3px solid #5c4a2e; border-top-color: var(--gold-dark); border-left-color: var(--gold-dark); box-shadow: 0 15px 40px rgba(0,0,0,0.9); text-align: center; position: relative; }
+        .header h1 { margin: 0; color: var(--gold-light); font-family: 'Cinzel', serif; font-size: 2.8rem; text-shadow: 2px 2px 5px #000; border-bottom: 2px solid var(--gold-dark); padding-bottom: 15px; margin-bottom: 20px; }
+        .input-group { margin-bottom: 20px; text-align: left; }
+        .input-group label { display: block; font-family: 'Cinzel', serif; color: var(--gold-light); font-size: 1.1rem; margin-bottom: 8px; }
+        .input-group input { width: 100%; padding: 12px; background: #110d0a; border: 2px solid var(--gold-dark); color: #fff; border-radius: 6px; font-size: 1.1rem; box-sizing: border-box; }
+        .btn-enter { width: 100%; padding: 18px; font-size: 1.5rem; font-family: 'Cinzel', serif; font-weight: bold; border-radius: 6px; cursor: pointer; color: white; background: linear-gradient(to bottom, #1e5631, #0a2e15); border: 2px solid #4caf50; box-shadow: 0 6px 15px rgba(0,0,0,0.7); }
+        #linkGenerator { display: none; background: rgba(0,0,0,0.6); padding: 15px; border-radius: 6px; border: 1px dashed var(--gold-dark); text-align: left; margin-top: 20px; }
+        .link-item { margin-bottom: 10px; font-family: monospace; font-size: 0.8rem; color: #bdc3c7; background: #000; padding: 8px; border-radius: 4px; word-break: break-all; }
     </style>
 </head>
 <body>
-
     <div class="portal-container">
-        <div class="header">
-            <h1>Gerbang Utama</h1>
-            <p>Sistem Manajemen Stream D&D</p>
-        </div>
-
+        <div class="header"><h1>Gerbang Utama</h1></div>
         <div class="input-group">
-            <label for="roomName">Nama Campaign / Sesi</label>
+            <label>Nama Campaign / Room ID</label>
             <input type="text" id="roomName" placeholder="Contoh: CurseOfStrahd" oninput="generateLinks()">
         </div>
-
-        <button class="btn-enter" onclick="enterRoom()">Buka Dashboard GM</button>
-
-        <div id="linkGenerator">
-            <h3>Contoh Link Player Controller</h3>
-            <div class="link-item" id="linkP1">player-controller.html?id=p1&room=...</div>
-            <div class="link-item" id="linkP2">player-controller.html?id=p2&room=...</div>
-            <p style="font-size: 0.8rem; color: #aaa; margin: 0;">*Bagikan link di atas kepada pemain sesuai ID mereka (p1, p2, dst).</p>
+        <div class="input-group">
+            <label>PIN Keamanan (Untuk Player)</label>
+            <input type="password" id="roomPin" placeholder="Masukkan 4-6 angka" oninput="generateLinks()">
         </div>
-
-        <div class="note">
-            Data tersimpan secara lokal di peramban ini berdasarkan nama Campaign yang Anda masukkan.
+        <button class="btn-enter" onclick="enterRoom()">Buka Dashboard GM</button>
+        <div id="linkGenerator">
+            <h3 style="color: var(--gold-light); font-family: 'Cinzel'; margin-top:0;">Link Player (Kirim ke teman)</h3>
+            <div class="link-item" id="linkP1">...</div>
+            <div class="link-item" id="linkP2">...</div>
+            <p style="font-size: 0.8rem; color: #ff6b6b;">*PIN akan dibutuhkan player saat membuka link.</p>
         </div>
     </div>
-
 <script>
-    function formatRoomId(rawName) {
-        // Menghapus spasi dan karakter aneh, mengubahnya jadi format URL yang aman
-        if (!rawName) return '';
-        return encodeURIComponent(rawName.trim().replace(/\s+/g, '-').toLowerCase());
-    }
-
+    function formatRoomId(rawName) { return encodeURIComponent(rawName.trim().replace(/\s+/g, '-').toLowerCase()); }
     function generateLinks() {
         const rawName = document.getElementById('roomName').value;
+        const pin = document.getElementById('roomPin').value;
         const linkArea = document.getElementById('linkGenerator');
-        
-        if (rawName.trim().length > 0) {
-            const roomId = formatRoomId(rawName);
+        if (rawName.trim().length > 0 && pin.length > 0) {
             linkArea.style.display = 'block';
-            
-            // Mengambil URL path saat ini agar link-nya lengkap
+            const roomId = formatRoomId(rawName);
             const basePath = window.location.href.replace('index.html', '').split('?')[0];
-            
-            document.getElementById('linkP1').innerText = `${basePath}player-controller.html?id=p1&room=${roomId}`;
-            document.getElementById('linkP2').innerText = `${basePath}player-controller.html?id=p2&room=${roomId}`;
-        } else {
-            linkArea.style.display = 'none';
-        }
+            document.getElementById('linkP1').innerText = `${basePath}player-controller.html?id=p1&room=${roomId}&key=${btoa(pin)}`;
+            document.getElementById('linkP2').innerText = `${basePath}player-controller.html?id=p2&room=${roomId}&key=${btoa(pin)}`;
+        } else { linkArea.style.display = 'none'; }
     }
-
     function enterRoom() {
         const rawName = document.getElementById('roomName').value;
-        
-        if (rawName.trim() === '') {
-            alert("Gerbang terkunci! Masukkan nama Campaign terlebih dahulu.");
-            document.getElementById('roomName').focus();
-            return;
-        }
-
+        const pin = document.getElementById('roomPin').value;
+        if (!rawName || !pin) { alert("Nama Room dan PIN wajib diisi!"); return; }
         const roomId = formatRoomId(rawName);
-        window.location.href = `gm-dashboard.html?room=${roomId}`;
+        // Simpan PIN di session agar GM bisa memvalidasi player
+        sessionStorage.setItem('gm_pin_' + roomId, pin);
+        window.location.href = `gm-dashboard.html?room=${roomId}&key=${btoa(pin)}`;
     }
-
-    // Eksekusi trigger event saat pertama load jika browser menahan cache inputan
-    window.onload = generateLinks;
 </script>
-
 </body>
 </html>
