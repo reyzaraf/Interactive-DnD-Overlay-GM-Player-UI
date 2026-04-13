@@ -74,7 +74,7 @@ const urlParams = new URLSearchParams(window.location.search);
     const roomId = urlParams.get('room') || 'default';
     const roomKey = 'dnd_session_' + roomId;
     const sceneKey = 'dnd_scene_' + roomId;
-    const peerHostId = 'farka-dnd-' + roomId; // ID Server Unik
+    const peerHostId = 'farka-dnd-' + roomId; 
 
     const allConditions = ["Blinded", "Charmed", "Deafened", "Frightened", "Grappled", "Incapacitated", "Invisible", "Paralyzed", "Petrified", "Poisoned", "Prone", "Restrained", "Stunned", "Unconscious"];
 
@@ -86,32 +86,35 @@ const urlParams = new URLSearchParams(window.location.search);
     let sessionData = JSON.parse(localStorage.getItem(roomKey)) || defaultData;
     sessionData = sessionData.map(p => ({ ...p, level: p.level || 1, conditions: p.conditions || [], initiative: p.initiative || 0, isTurn: p.isTurn || false, deathSaves: p.deathSaves || { success: 0, fail: 0 } }));
 
-    document.querySelector('h1').innerHTML = `D&D GM Dashboard <br><span style="font-size: 1rem; color: #f39c12;">⏳ Menyiapkan Server Room: ${roomId}...</span>`;
+    document.querySelector('h1').innerHTML = `D&D GM Dashboard <br><span id="serverStatus" style="font-size: 1rem; color: #f39c12;">⏳ Menyiapkan Server Room: ${roomId}...</span>`;
 
     // ==========================================
-    // SISTEM PEER JS (SERVER HOST)
+    // SISTEM PEER JS (SERVER HOST) DENGAN STUN GOOGLE
     // ==========================================
-    const peer = new Peer(peerHostId);
+    const peerOptions = {
+        config: { 'iceServers': [ { urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' } ] }
+    };
+    
+    let peer = new Peer(peerHostId, peerOptions);
     let connectedClients = [];
 
     peer.on('open', (id) => {
-        document.querySelector('h1').innerHTML = `D&D GM Dashboard <br><span style="font-size: 1rem; color: #2ecc71;">🌐 Server Online (Room: ${roomId})</span>`;
+        document.getElementById('serverStatus').innerHTML = `🌐 Server Online (Room: ${roomId})`;
+        document.getElementById('serverStatus').style.color = '#2ecc71';
     });
 
     peer.on('error', (err) => {
-        document.querySelector('h1').innerHTML = `D&D GM Dashboard <br><span style="font-size: 1rem; color: #e74c3c;">❌ Error: Room sudah dipakai / Koneksi Gagal</span>`;
+        document.getElementById('serverStatus').innerHTML = `❌ Error/Terputus: Refresh Halaman!`;
+        document.getElementById('serverStatus').style.color = '#e74c3c';
         console.error(err);
     });
 
     peer.on('connection', (conn) => {
-        connectedClients.push(conn);
         conn.on('open', () => {
-            // Kirim data lengkap saat klien baru masuk
-            const sceneData = JSON.parse(localStorage.getItem(sceneKey)) || {title: '', subtitle: ''};
-            conn.send({ type: 'SYNC', session: sessionData, scene: sceneData });
+            connectedClients.push(conn);
+            broadcastState(); // Langsung kirim data saat klien berhasil masuk
         });
         
-        // Mendengarkan perintah (klik) dari Player Controller
         conn.on('data', (data) => {
             if (data.type === 'ACTION') handlePlayerAction(data);
         });
@@ -121,14 +124,17 @@ const urlParams = new URLSearchParams(window.location.search);
         });
     });
 
-    // Penyiaran data ke semua layar (OBS & HP Pemain)
+    // Membersihkan koneksi yang nyangkut (Stale connections) setiap 5 detik
+    setInterval(() => {
+        connectedClients = connectedClients.filter(c => c.open);
+    }, 5000);
+
     function broadcastState() {
         const sceneData = JSON.parse(localStorage.getItem(sceneKey)) || {title: '', subtitle: ''};
         const payload = { type: 'SYNC', session: sessionData, scene: sceneData };
         connectedClients.forEach(c => { if(c.open) c.send(payload); });
     }
 
-    // Memproses klik dari HP pemain
     function handlePlayerAction(data) {
         const idx = sessionData.findIndex(p => p.id === data.playerId);
         if(idx === -1) return;
@@ -143,7 +149,7 @@ const urlParams = new URLSearchParams(window.location.search);
             if(data.saveType === 'success' && sessionData[idx].deathSaves.success < 3) sessionData[idx].deathSaves.success++;
             if(data.saveType === 'fail' && sessionData[idx].deathSaves.fail < 3) sessionData[idx].deathSaves.fail++;
         }
-        saveData(); // Simpan dan otomatis siarkan
+        saveData(); 
     }
     // ==========================================
 
@@ -274,7 +280,7 @@ const urlParams = new URLSearchParams(window.location.search);
 
     function saveData() { 
         localStorage.setItem(roomKey, JSON.stringify(sessionData)); 
-        broadcastState(); // Otomatis mengirim ke OBS dan Player saat GM ngerubah sesuatu
+        broadcastState(); 
         renderDashboard(); 
     }
 

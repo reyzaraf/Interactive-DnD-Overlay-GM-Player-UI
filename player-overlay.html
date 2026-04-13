@@ -177,7 +177,7 @@
 
         <div id="uiConditions"></div>
     </div>
-
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
    const urlParams = new URLSearchParams(window.location.search);
     const playerId = urlParams.get('id') || 'p1';
@@ -189,33 +189,51 @@
     let audioCtx = null;
     let audioReady = false;
     let isFirstLoad = true;
+    let peer;
 
     // ==========================================
-    // SISTEM PEER JS (KLIEN OBS)
+    // SISTEM PEER JS (KLIEN OBS) DENGAN AUTO RECONNECT
     // ==========================================
-    const peer = new Peer(); 
     const errorMsg = document.getElementById('errorMsg');
-    errorMsg.innerText = "⏳ Menghubungkan ke GM (Room: " + roomId + ")...";
-    errorMsg.style.display = 'block';
+    const peerOptions = { config: { 'iceServers': [ { urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' } ] } };
 
-    peer.on('open', () => {
-        const conn = peer.connect(peerHostId);
-        conn.on('open', () => { errorMsg.style.display = 'none'; });
-        
-        conn.on('data', (msg) => {
-            if (msg.type === 'SYNC') updateUI(msg.session);
-        });
-
-        conn.on('close', () => {
-            errorMsg.innerText = "❌ Koneksi ke GM terputus.";
-            errorMsg.style.display = 'block';
-        });
-    });
-
-    peer.on('error', (err) => {
-        errorMsg.innerText = "❌ Gagal terhubung ke GM.";
+    function connectToServer() {
+        errorMsg.innerText = "⏳ Menghubungkan ke GM (Room: " + roomId + ")...";
         errorMsg.style.display = 'block';
-    });
+
+        peer = new Peer(peerOptions);
+
+        peer.on('open', () => {
+            const conn = peer.connect(peerHostId, { reliable: true });
+            
+            conn.on('open', () => { 
+                errorMsg.style.display = 'none'; 
+            });
+            
+            conn.on('data', (msg) => {
+                if (msg.type === 'SYNC') updateUI(msg.session);
+            });
+
+            conn.on('close', () => {
+                errorMsg.innerText = "❌ Koneksi ke GM terputus. Menyambung ulang...";
+                errorMsg.style.display = 'block';
+                setTimeout(reconnect, 3000);
+            });
+        });
+
+        peer.on('error', (err) => {
+            errorMsg.innerText = "❌ Gagal terhubung ke GM. Mencari ulang...";
+            errorMsg.style.display = 'block';
+            setTimeout(reconnect, 3000);
+        });
+    }
+
+    function reconnect() {
+        if(peer) peer.destroy();
+        connectToServer();
+    }
+
+    connectToServer();
     // ==========================================
 
     function initAudio() {
