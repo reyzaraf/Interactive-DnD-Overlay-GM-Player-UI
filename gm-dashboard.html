@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D&D GM Dashboard</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Cormorant+Garamond:wght@600&display=swap');
+        :root { --gold-light: #d4af37; --gold-dark: #8b7348; --bg-texture: linear-gradient(135deg, #1c140d 0%, #0a0705 100%); --card-bg: linear-gradient(145deg, #2a2118, #1a140f); }
+        body { font-family: 'Cormorant Garamond', serif; background: var(--bg-texture); color: #dcdde1; margin: 0; padding: 20px; }
+        h1 { text-align: center; color: var(--gold-light); font-family: 'Cinzel', serif; font-size: 2.5rem; text-shadow: 2px 2px 5px #000; margin-bottom: 20px; border-bottom: 2px solid var(--gold-dark); padding-bottom: 10px; }
+        
+        /* Scene Control Panel */
+        .scene-panel { background: #110d0a; border: 2px solid var(--gold-dark); padding: 20px; border-radius: 6px; margin-bottom: 30px; text-align: center; box-shadow: inset 0 0 10px rgba(0,0,0,0.8); }
+        .scene-panel h2 { margin-top: 0; color: #bdc3c7; font-family: 'Cinzel', serif; font-size: 1.2rem; }
+        .scene-inputs { display: flex; gap: 15px; justify-content: center; margin-bottom: 15px; }
+        .scene-inputs input { padding: 10px; background: #222; border: 1px solid var(--gold-dark); color: white; border-radius: 4px; font-size: 1rem; width: 30%; }
+        .btn-scene { padding: 10px 20px; background: linear-gradient(to bottom, #b86704, #7a4100); color: white; border: 1px solid #f39c12; cursor: pointer; font-family: 'Cinzel', serif; font-weight: bold; border-radius: 4px; }
+        .top-controls { display: flex; justify-content: space-between; margin-bottom: 20px; }
+        .btn-action { padding: 10px 20px; background: #34495e; color: white; border: 1px solid #5d6d7e; cursor: pointer; font-family: 'Cinzel', serif; border-radius: 4px; font-weight: bold; }
+
+        .grid-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+        .player-card { background: var(--card-bg); border: 2px solid var(--gold-dark); border-radius: 6px; padding: 15px; position: relative; box-shadow: 0 8px 15px rgba(0,0,0,0.8), inset 0 0 10px rgba(0,0,0,0.5); }
+        .player-card.inactive { opacity: 0.4; filter: grayscale(100%); border-color: #444; }
+        .player-card.is-turn { border-color: #f1c40f; box-shadow: 0 0 15px rgba(241, 196, 15, 0.5); }
+        .player-card h3 { font-family: 'Cinzel', serif; font-size: 1.3rem; margin-top: 0; color: var(--gold-light); text-shadow: 1px 1px 2px #000; }
+        .form-group { margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+        .form-group label { font-family: 'Cinzel', serif; font-size: 0.9rem; color: #bdc3c7; width: 70px; }
+        .form-group input, .form-group select { flex: 1; padding: 6px; background: #110d0a; border: 1px solid var(--gold-dark); color: var(--gold-light); border-radius: 4px; font-family: 'Segoe UI', Tahoma, sans-serif; font-weight: bold; width: 100%; box-sizing: border-box; }
+        .form-group select[multiple] { height: 70px; font-family: 'Cormorant Garamond', serif; font-size: 1rem; }
+        .condition-container { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+        .btn-clear-cond { background: linear-gradient(to bottom, #34495e, #1a252f); color: #bdc3c7; border: 1px solid #5d6d7e; padding: 4px; border-radius: 4px; cursor: pointer; font-family: 'Cinzel', serif; font-size: 0.8rem; }
+        .hp-controls { display: flex; gap: 5px; margin-top: 15px; justify-content: center; }
+        .hp-controls button { padding: 8px 12px; border: 1px solid; border-radius: 4px; cursor: pointer; font-family: 'Cinzel', serif; font-weight: bold; }
+        .btn-dmg { background: linear-gradient(to bottom, #8a0303, #4a0000); color: white; border-color: #ff3333; }
+        .btn-heal { background: linear-gradient(to bottom, #1e5631, #0a2e15); color: white; border-color: #4caf50; }
+        
+        .death-saves-panel { text-align: center; background: #300000; padding: 10px; border-radius: 4px; border: 1px solid #ff3333; margin-top: 10px; }
+        .death-saves-panel p { margin: 0 0 5px 0; color: #fff; font-family: 'Cinzel', serif; }
+
+        .btn-overlay { width: 100%; padding: 10px; margin-top: 15px; background: linear-gradient(to bottom, #b86704, #7a4100); color: white; border: 1px solid #f39c12; border-radius: 4px; cursor: pointer; font-family: 'Cinzel', serif; font-weight: bold; }
+        .btn-copy { width: 100%; padding: 10px; margin-top: 5px; background: linear-gradient(to bottom, #1e5631, #0a2e15); color: white; border: 1px solid #4caf50; border-radius: 4px; cursor: pointer; font-family: 'Cinzel', serif; font-weight: bold; }
+        .btn-toggle { width: 100%; padding: 10px; margin-top: 10px; background: linear-gradient(to bottom, #34495e, #1a252f); color: white; border: 1px solid #5d6d7e; border-radius: 4px; cursor: pointer; font-family: 'Cinzel', serif; }
+        .btn-reset { display: block; margin: 40px auto; padding: 12px 25px; background: linear-gradient(to bottom, #4a235a, #2a0a3a); color: var(--gold-light); border: 2px solid #8e44ad; border-radius: 4px; cursor: pointer; font-family: 'Cinzel', serif; font-size: 1.2rem; }
+    </style>
+</head>
+<body>
+
+    <h1>D&D Game Master Dashboard</h1>
+
+    <div class="scene-panel">
+        <h2>Atur Scene Banner Stream</h2>
+        <div class="scene-inputs">
+            <input type="text" id="sceneTitleInput" placeholder="Judul (Misal: Hutan Gelap)">
+            <input type="text" id="sceneSubtitleInput" placeholder="Sub (Misal: Boss: Naga Merah)">
+        </div>
+        <button class="btn-scene" onclick="updateSceneData()">Tampilkan di Stream</button>
+        <button class="btn-scene" style="background: #333;" onclick="clearSceneData()">Sembunyikan</button>
+        <br>
+        <button class="btn-scene" style="background: linear-gradient(to bottom, #2980b9, #1a5276); border-color: #3498db; margin-top: 15px; width: 100%; max-width: 400px;" onclick="openSceneOverlay()">📺 Buka Scene Banner di Tab Baru</button>
+    </div>
+
+    <div class="top-controls">
+        <button class="btn-action" onclick="sortInitiative()">Urutkan Inisiatif Tertinggi</button>
+        <button class="btn-action" style="background: #27ae60; border-color: #2ecc71;" onclick="nextTurn()">Giliran Berikutnya (Next Turn) ⏭️</button>
+    </div>
+    
+    <div class="grid-container" id="gmGrid"></div>
+
+    <button class="btn-reset" onclick="resetAll()">Reset Semua Data</button>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomId = urlParams.get('room') || 'default';
+    const storageKey = 'dnd_session_data_' + roomId;
+    const sceneKey = 'dnd_scene_data_' + roomId;
+
+    const allConditions = ["Blinded", "Charmed", "Deafened", "Frightened", "Grappled", "Incapacitated", "Invisible", "Paralyzed", "Petrified", "Poisoned", "Prone", "Restrained", "Stunned", "Unconscious"];
+
+    const defaultData = Array.from({length: 10}, (_, i) => ({
+        id: `p${i+1}`, active: i < 4, name: `Player ${i+1}`, className: "Class", level: 1, ac: 10, hp: 20, maxHp: 20,
+        conditions: [], initiative: 0, isTurn: false, deathSaves: { success: 0, fail: 0 }
+    }));
+
+    let sessionData = JSON.parse(localStorage.getItem(storageKey)) || defaultData;
+    sessionData = sessionData.map(p => ({ ...p, level: p.level || 1, conditions: p.conditions || [], initiative: p.initiative || 0, isTurn: p.isTurn || false, deathSaves: p.deathSaves || { success: 0, fail: 0 } }));
+    document.querySelector('h1').innerHTML = `D&D GM Dashboard <br><span style="font-size: 1rem; color: #bdc3c7;">Room: ${roomId}</span>`;
+
+    function updateSceneData() {
+        const title = document.getElementById('sceneTitleInput').value;
+        const sub = document.getElementById('sceneSubtitleInput').value;
+        localStorage.setItem(sceneKey, JSON.stringify({ title: title, subtitle: sub }));
+        alert("Scene diperbarui!");
+    }
+
+    function clearSceneData() {
+        document.getElementById('sceneTitleInput').value = '';
+        document.getElementById('sceneSubtitleInput').value = '';
+        localStorage.setItem(sceneKey, JSON.stringify({ title: '', subtitle: '' }));
+    }
+
+    function openSceneOverlay() {
+        window.open(`scene-overlay.html?room=${roomId}`, '_blank');
+    }
+
+    function copyPlayerLink(playerId) {
+        const basePath = window.location.href.split('?')[0].replace('gm-dashboard.html', '');
+        const link = `${basePath}player-controller.html?id=${playerId}&room=${roomId}`;
+        
+        navigator.clipboard.writeText(link).then(() => {
+            alert(`Link Player Controller untuk ID ${playerId} berhasil disalin!\nSilakan paste (Ctrl+V) ke pemain.`);
+        }).catch(err => {
+            alert(`Gagal menyalin link. Silakan copy manual:\n${link}`);
+        });
+    }
+
+    const existingScene = JSON.parse(localStorage.getItem(sceneKey));
+    if(existingScene) {
+        document.getElementById('sceneTitleInput').value = existingScene.title || '';
+        document.getElementById('sceneSubtitleInput').value = existingScene.subtitle || '';
+    }
+
+    function renderDashboard() {
+        const grid = document.getElementById('gmGrid');
+        grid.innerHTML = '';
+
+        sessionData.forEach((player, index) => {
+            const card = document.createElement('div');
+            card.className = `player-card ${player.active ? '' : 'inactive'} ${player.isTurn ? 'is-turn' : ''}`;
+            
+            let conditionOptions = allConditions.map(cond => `<option value="${cond}" ${player.conditions.includes(cond) ? 'selected' : ''}>${cond}</option>`).join('');
+
+            let hpSectionHTML = '';
+            if (player.hp <= 0 && player.maxHp > 0) {
+                hpSectionHTML = `
+                    <div class="death-saves-panel">
+                        <p>💀 SEKARAT (Death Saves)</p>
+                        Sukses: ${player.deathSaves.success} | Gagal: ${player.deathSaves.fail}
+                        <br><button class="btn-heal" style="margin-top:5px; padding: 4px;" onclick="modifyHP(${index}, 1)">Heal (Bangkit)</button>
+                    </div>`;
+            } else {
+                hpSectionHTML = `
+                    <div class="hp-controls">
+                        <button class="btn-dmg" onclick="modifyHP(${index}, -5)" ${!player.active ? 'disabled' : ''}>-5</button>
+                        <button class="btn-dmg" onclick="modifyHP(${index}, -1)" ${!player.active ? 'disabled' : ''}>-1</button>
+                        <button class="btn-heal" onclick="modifyHP(${index}, 1)" ${!player.active ? 'disabled' : ''}>+1</button>
+                        <button class="btn-heal" onclick="modifyHP(${index}, 5)" ${!player.active ? 'disabled' : ''}>+5</button>
+                    </div>`;
+            }
+
+            card.innerHTML = `
+                <div style="position: absolute; top: 10px; right: 10px; background: #110d0a; border: 1px solid var(--gold-dark); padding: 2px 6px; border-radius: 4px; font-family: 'Cinzel', serif; font-size: 0.8rem; color: var(--gold-light);">ID: ${player.id}</div>
+                <h3>${player.isTurn ? '⚔️ ' : ''}Slot ${index + 1}</h3>
+                
+                <div style="display:flex; gap:10px;">
+                    <div style="flex:1;">
+                        <div class="form-group"><label>Nama</label><input type="text" value="${player.name}" onchange="updateData(${index}, 'name', this.value)" ${!player.active ? 'disabled' : ''}></div>
+                        <div class="form-group"><label>Class</label><input type="text" value="${player.className}" onchange="updateData(${index}, 'className', this.value)" ${!player.active ? 'disabled' : ''}></div>
+                        <div class="form-group"><label>Level</label><input type="number" value="${player.level}" onchange="updateData(${index}, 'level', this.value)" ${!player.active ? 'disabled' : ''}></div>
+                    </div>
+                    <div style="flex:1;">
+                        <div class="form-group"><label>AC</label><input type="number" value="${player.ac}" onchange="updateData(${index}, 'ac', this.value)" ${!player.active ? 'disabled' : ''}></div>
+                        <div class="form-group"><label>Inisiatif</label><input type="number" value="${player.initiative}" onchange="updateData(${index}, 'initiative', this.value)" ${!player.active ? 'disabled' : ''} style="border-color:#3498db;"></div>
+                        <div class="form-group"><label>Max HP</label><input type="number" value="${player.maxHp}" onchange="updateData(${index}, 'maxHp', this.value)" ${!player.active ? 'disabled' : ''}></div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Curr HP</label>
+                    <input type="number" value="${player.hp}" onchange="updateData(${index}, 'hp', this.value)" ${!player.active ? 'disabled' : ''} style="color: ${player.hp <= 0 ? '#e74c3c' : '#d4af37'};">
+                </div>
+                
+                <div class="form-group" style="align-items: flex-start;">
+                    <label style="margin-top: 5px;">Kondisi</label>
+                    <div class="condition-container">
+                        <select multiple onchange="updateConditions(${index}, this)" ${!player.active ? 'disabled' : ''}>${conditionOptions}</select>
+                        <button class="btn-clear-cond" onclick="clearConditions(${index})" ${!player.active ? 'disabled' : ''}>Set Normal</button>
+                    </div>
+                </div>
+
+                ${hpSectionHTML}
+
+                <button class="btn-overlay" onclick="window.open('player-overlay.html?id=${player.id}&room=${roomId}', '_blank')" ${!player.active ? 'disabled' : ''}>Buka Overlay Stream</button>
+                <button class="btn-copy" onclick="copyPlayerLink('${player.id}')" ${!player.active ? 'disabled' : ''}>🔗 Copy Link Player Controller</button>
+                <button class="btn-toggle" onclick="togglePlayer(${index})">${player.active ? 'Nonaktifkan Player' : 'Aktifkan Player'}</button>
+            `;
+            grid.appendChild(card);
+        });
+        saveData();
+    }
+
+    function updateData(index, key, value) {
+        sessionData[index][key] = (key === 'ac' || key === 'hp' || key === 'maxHp' || key === 'level' || key === 'initiative') ? parseInt(value) || 0 : value;
+        if (key === 'hp' && sessionData[index].hp > 0) {
+            sessionData[index].deathSaves = { success: 0, fail: 0 };
+        }
+        saveData(); renderDashboard(); 
+    }
+
+    function updateConditions(index, selectElement) {
+        sessionData[index].conditions = Array.from(selectElement.selectedOptions).map(opt => opt.value);
+        saveData(); renderDashboard();
+    }
+    function clearConditions(index) { sessionData[index].conditions = []; saveData(); renderDashboard(); }
+
+    function modifyHP(index, amount) {
+        let newHP = sessionData[index].hp + amount;
+        if (newHP < 0) newHP = 0;
+        if (newHP > sessionData[index].maxHp) newHP = sessionData[index].maxHp;
+        sessionData[index].hp = newHP;
+        if (newHP > 0) sessionData[index].deathSaves = { success: 0, fail: 0 };
+        saveData(); renderDashboard();
+    }
+
+    function sortInitiative() {
+        sessionData.sort((a, b) => b.initiative - a.initiative);
+        saveData(); renderDashboard();
+    }
+
+    function nextTurn() {
+        let currentIndex = sessionData.findIndex(p => p.isTurn && p.active);
+        sessionData.forEach(p => p.isTurn = false);
+
+        let nextIndex = currentIndex + 1;
+        let found = false;
+        for(let i=0; i<sessionData.length; i++) {
+            if(nextIndex >= sessionData.length) nextIndex = 0;
+            if(sessionData[nextIndex].active && sessionData[nextIndex].hp > 0) {
+                sessionData[nextIndex].isTurn = true;
+                found = true; break;
+            }
+            nextIndex++;
+        }
+        if(!found && sessionData.filter(p=>p.active).length > 0) {
+            sessionData[0].isTurn = true;
+        }
+        saveData(); renderDashboard();
+    }
+
+    function togglePlayer(index) { sessionData[index].active = !sessionData[index].active; saveData(); renderDashboard(); }
+    function saveData() { localStorage.setItem(storageKey, JSON.stringify(sessionData)); }
+    function resetAll() { if(confirm("Reset Room " + roomId + "?")) { sessionData = JSON.parse(JSON.stringify(defaultData)); saveData(); renderDashboard(); } }
+
+    // PENAMBAHAN BARU: EVENT LISTENER AGAR GM DASHBOARD SINKRON DENGAN PLAYER CONTROLLER
+    window.addEventListener('storage', function(e) {
+        if (e.key === storageKey) {
+            const freshData = localStorage.getItem(storageKey);
+            if (freshData) {
+                sessionData = JSON.parse(freshData);
+                renderDashboard();
+            }
+        }
+    });
+
+    renderDashboard();
+</script>
+</body>
+</html>

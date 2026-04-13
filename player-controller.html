@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player Controller</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Cormorant+Garamond:wght@600&display=swap');
+        :root { --gold-light: #d4af37; --gold-dark: #8b7348; --bg-texture: linear-gradient(135deg, #1c140d 0%, #0a0705 100%); --panel-bg: linear-gradient(145deg, #2a2118, #1a140f); }
+        body { font-family: 'Cormorant Garamond', serif; background: var(--bg-texture); color: #dcdde1; margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .remote-container { background: var(--panel-bg); width: 100%; max-width: 400px; border-radius: 8px; padding: 25px; border: 3px solid #5c4a2e; text-align: center; position: relative; box-shadow: 0 15px 30px rgba(0,0,0,0.9); transition: all 0.5s; }
+        .remote-container.is-dying { background: linear-gradient(145deg, #300000, #110000); border-color: #ff3333; box-shadow: inset 0 0 50px rgba(255,0,0,0.5); }
+        .header h1 { margin: 0; color: var(--gold-light); font-family: 'Cinzel', serif; font-size: 2rem; }
+        .header p { margin: 5px 0 20px 0; color: #bdc3c7; font-size: 1.2rem; font-style: italic; }
+        .turn-badge { display:none; background:#f1c40f; color:#000; font-family:'Cinzel',serif; font-weight:bold; padding:5px 15px; border-radius:20px; margin-bottom:15px; }
+        
+        .stat-box { background: #110d0a; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid var(--gold-dark); }
+        .stat-box div { font-family: 'Cinzel', serif; color: var(--gold-light); font-size: 1.1rem; }
+        .stat-box h2 { margin: 0; font-family: 'Cinzel', serif; font-size: 3.5rem; color: #ff4757; }
+        #ctrlConditions { font-family: 'Cormorant Garamond', serif; color: #e67e22; font-weight: bold; margin-bottom: 20px; border-top: 1px solid #3d2e18; padding-top: 10px; }
+        
+        /* HP Controls */
+        .controls-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        button { padding: 20px; font-size: 1.5rem; font-family: 'Cinzel', serif; font-weight: bold; border-radius: 8px; cursor: pointer; color: white; box-shadow: 0 6px 12px rgba(0,0,0,0.7); }
+        button:active { transform: translateY(4px); }
+        .btn-dmg-large { background: linear-gradient(to bottom, #8a0303, #4a0000); border: 2px solid #ff3333; }
+        .btn-heal-large { background: linear-gradient(to bottom, #1e5631, #0a2e15); border: 2px solid #4caf50; }
+
+        /* Death Saves Controls */
+        .death-controls { display: none; margin-top: 20px; }
+        .is-dying .death-controls { display: block; }
+        .is-dying .controls-grid { display: none; } /* Hide HP buttons when dying */
+        .ds-score { font-family: 'Cinzel', serif; font-size: 1.5rem; color: white; margin-bottom: 15px; display:flex; justify-content: space-around;}
+        .btn-ds-succ { background: linear-gradient(to bottom, #2ecc71, #145a32); width:100%; border: 2px solid #2ecc71; margin-bottom:10px; }
+        .btn-ds-fail { background: linear-gradient(to bottom, #000, #222); width:100%; border: 2px solid #555; }
+    </style>
+</head>
+<body>
+    <div class="remote-container" id="remoteController">
+        <div class="turn-badge" id="turnBadge">🔥 GILIRANMU! 🔥</div>
+        <div class="header"><h1 id="ctrlName">Loading...</h1><p>Lv. <span id="ctrlLevel">1</span> | AC <span id="ctrlAC">10</span></p></div>
+
+        <div class="stat-box" id="hpBox">
+            <div id="hpLabel">Current HP</div>
+            <h2><span id="ctrlCurrentHP">0</span> <span style="font-size:1.5rem; color:#888;">/ <span id="ctrlMaxHP">0</span></span></h2>
+        </div>
+
+        <div id="ctrlConditions">Kondisi: Normal</div>
+
+        <div class="controls-grid">
+            <button class="btn-dmg-large" onclick="modifyHP(-5)">-5 HP</button>
+            <button class="btn-heal-large" onclick="modifyHP(5)">+5 HP</button>
+            <button class="btn-dmg-large" style="font-size:1.2rem" onclick="modifyHP(-1)">-1 HP</button>
+            <button class="btn-heal-large" style="font-size:1.2rem" onclick="modifyHP(1)">+1 HP</button>
+        </div>
+
+        <div class="death-controls">
+            <h3 style="color:#ff3333; font-family:'Cinzel', serif;">DEATH SAVES</h3>
+            <div class="ds-score">
+                <span style="color:#2ecc71">Sukses: <span id="dsSuccScore">0</span></span>
+                <span style="color:#e74c3c">Gagal: <span id="dsFailScore">0</span></span>
+            </div>
+            <button class="btn-ds-succ" onclick="addDeathSave('success')">Roll Sukses</button>
+            <button class="btn-ds-fail" onclick="addDeathSave('fail')">Roll Gagal</button>
+            <p style="color:#888; font-size:0.8rem;">*GM yang bisa me-reset / memulihkan HP-mu</p>
+        </div>
+    </div>
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const playerId = urlParams.get('id') || 'p1';
+    const roomId = urlParams.get('room') || 'default';
+    const storageKey = 'dnd_session_data_' + roomId;
+
+    function loadData() { return JSON.parse(localStorage.getItem(storageKey)); }
+
+    function updateUI() {
+        const sessionData = loadData();
+        const player = sessionData ? sessionData.find(p => p.id === playerId) : null;
+        if (!player || !player.active) { document.body.innerHTML = "<h2 style='color:red;'>Player Tidak Aktif</h2>"; return; }
+
+        document.getElementById('ctrlName').innerText = player.name;
+        document.getElementById('ctrlLevel').innerText = player.level;
+        document.getElementById('ctrlAC').innerText = player.ac;
+        document.getElementById('ctrlCurrentHP').innerText = player.hp;
+        document.getElementById('ctrlMaxHP').innerText = player.maxHp;
+        
+        document.getElementById('turnBadge').style.display = player.isTurn ? 'inline-block' : 'none';
+
+        if (player.conditions && player.conditions.length > 0) document.getElementById('ctrlConditions').innerText = "Kondisi: " + player.conditions.join(', ');
+        else document.getElementById('ctrlConditions').innerText = "Kondisi: Normal";
+
+        // Cek Sekarat
+        const remote = document.getElementById('remoteController');
+        if (player.hp <= 0 && player.maxHp > 0) {
+            remote.classList.add('is-dying');
+            document.getElementById('hpLabel').innerText = "💀 STATUS SEKARAT 💀";
+            document.getElementById('dsSuccScore').innerText = player.deathSaves.success;
+            document.getElementById('dsFailScore').innerText = player.deathSaves.fail;
+        } else {
+            remote.classList.remove('is-dying');
+            document.getElementById('hpLabel').innerText = "Current HP";
+        }
+    }
+
+    function modifyHP(amount) {
+        const sessionData = loadData();
+        const idx = sessionData.findIndex(p => p.id === playerId);
+        if (idx === -1) return;
+        let newHP = sessionData[idx].hp + amount;
+        if (newHP < 0) newHP = 0; if (newHP > sessionData[idx].maxHp) newHP = sessionData[idx].maxHp;
+        sessionData[idx].hp = newHP;
+        localStorage.setItem(storageKey, JSON.stringify(sessionData));
+        updateUI();
+    }
+
+    function addDeathSave(type) {
+        const sessionData = loadData();
+        const idx = sessionData.findIndex(p => p.id === playerId);
+        if (idx === -1) return;
+        
+        if(type === 'success' && sessionData[idx].deathSaves.success < 3) sessionData[idx].deathSaves.success++;
+        if(type === 'fail' && sessionData[idx].deathSaves.fail < 3) sessionData[idx].deathSaves.fail++;
+        
+        localStorage.setItem(storageKey, JSON.stringify(sessionData));
+        updateUI();
+    }
+
+    updateUI();
+    window.addEventListener('storage', e => { if (e.key === storageKey) updateUI(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPG Player Overlay</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Cormorant+Garamond:ital,wght@0,600;1,600&display=swap');
+
+        :root {
+            --gold-light: #f1c40f;
+            --gold-dark: #b8860b;
+            --hp-red: #8a0303;
+            --hp-red-light: #ff3333;
+            --bg-texture: linear-gradient(135deg, #1c140d 0%, #0a0705 100%);
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: transparent; 
+            overflow: hidden;
+        }
+
+        .overlay-container {
+            width: 340px;
+            background: var(--bg-texture);
+            border: 3px solid #5c4a2e;
+            border-top-color: #8b7348;
+            border-left-color: #8b7348;
+            border-radius: 4px;
+            padding: 18px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.9), inset 0 0 20px rgba(0,0,0,0.8);
+            position: relative;
+        }
+
+        .overlay-container::before {
+            content: '';
+            position: absolute;
+            top: -6px; left: -6px; right: -6px; bottom: -6px;
+            border: 1px solid #c5a059;
+            pointer-events: none;
+            opacity: 0.5;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #3d2e18;
+            padding-bottom: 10px;
+        }
+
+        .char-info {
+            flex-grow: 1;
+        }
+
+        .char-info h2 { 
+            margin: 0 0 2px 0; 
+            font-family: 'Cinzel', serif;
+            font-size: 1.4rem; 
+            color: var(--gold-light); 
+            text-shadow: 2px 2px 4px #000; 
+            letter-spacing: 1px;
+        }
+        
+        .char-info p { 
+            margin: 0; 
+            font-family: 'Cormorant Garamond', serif; 
+            font-size: 1.1rem; 
+            color: #dcdde1; 
+            font-style: italic; 
+        }
+
+        .ac-badge {
+            background: radial-gradient(circle, #5e4726 0%, #2a1f11 100%);
+            border: 2px solid var(--gold-dark);
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.9), inset 0 2px 5px rgba(255,255,255,0.2);
+        }
+
+        .ac-label {
+            font-family: 'Cinzel', serif;
+            font-size: 0.6rem;
+            color: var(--gold-dark);
+            margin-bottom: -2px;
+        }
+
+        .ac-value {
+            font-family: 'Cinzel', serif;
+            font-size: 1.2rem;
+            color: #fff;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px #000;
+        }
+
+        .hp-section { position: relative; }
+
+        .hp-text {
+            font-family: 'Cinzel', serif;
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            line-height: 26px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 1px 1px 3px #000, -1px -1px 3px #000;
+            z-index: 2;
+        }
+
+        .hp-bar-bg {
+            width: 100%;
+            height: 26px;
+            background: #111;
+            border: 2px solid #3d2b1f;
+            border-bottom-color: #5c4230;
+            border-radius: 3px;
+            box-shadow: inset 0 4px 6px rgba(0,0,0,0.8);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hp-bar-fill {
+            height: 100%;
+            background: linear-gradient(to bottom, var(--hp-red-light) 0%, var(--hp-red) 50%, #4a0000 100%);
+            border-top: 1px solid #ff9999;
+            width: 100%;
+            transition: width 0.4s ease-out, background 0.3s;
+        }
+
+        @keyframes pulse-critical {
+            0% { box-shadow: inset 0 0 10px #ff0000; }
+            50% { box-shadow: inset 0 0 30px #ff0000; }
+            100% { box-shadow: inset 0 0 10px #ff0000; }
+        }
+        .critical-glow { animation: pulse-critical 1.5s infinite; }
+
+        /* Floating Combat Text Container */
+        #floatingTextContainer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; /* Klik bisa tembus */
+            z-index: 10;
+        }
+
+        /* Gaya Angka Melayang */
+        .floating-text {
+            position: absolute;
+            top: 50%; /* Mulai dari tengah */
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Cinzel', serif;
+            font-size: 2.5rem;
+            font-weight: bold;
+            text-shadow: 3px 3px 6px #000;
+            animation: floatUpAndFade 2s ease-out forwards;
+            opacity: 0;
+        }
+        .floating-text.damage { color: #ff3333; }
+        .floating-text.heal { color: #4caf50; }
+
+        @keyframes floatUpAndFade {
+            0% { transform: translate(-50%, -50%); opacity: 1; }
+            100% { transform: translate(-50%, -150%); opacity: 0; }
+        }
+
+        /* Kontainer Icon Kondisi */
+        #uiConditions {
+            display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; justify-content: center;
+        }
+        .condition-badge {
+            font-family: 'Cinzel', serif; font-size: 0.7rem; padding: 2px 6px; 
+            border-radius: 4px; color: #fff; text-transform: uppercase; 
+            border: 1px solid rgba(255,255,255,0.3); text-shadow: 1px 1px 1px #000;
+        }
+        /* Warna spesifik untuk kondisi standar D&D */
+        .condition-blinded { background-color: #555; }
+        .condition-charmed { background-color: #d175d1; }
+        .condition-deafened { background-color: #7f8c8d; }
+        .condition-frightened { background-color: #e67e22; }
+        .condition-grappled { background-color: #a0522d; }
+        .condition-incapacitated { background-color: #444; }
+        .condition-invisible { background-color: #87ceeb; color: #000; border-color: #fff; }
+        .condition-paralyzed { background-color: #ffee00; color: #000; border-color: #b8860b; }
+        .condition-petrified { background-color: #808080; }
+        .condition-poisoned { background-color: #228b22; }
+        .condition-prone { background-color: #8b4513; }
+        .condition-restrained { background-color: #cd853f; }
+        .condition-stunned { background-color: #ffd700; color: #000; border-color: #b8860b; }
+        .condition-unconscious { background-color: #000; border-color: #ff0000; }
+
+        #errorMsg {
+            display: none; color: #e74c3c; font-family: 'Cinzel', serif;
+            font-weight: bold; text-align: center; background: rgba(0,0,0,0.8);
+            padding: 10px; border: 1px solid #e74c3c;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="errorMsg">Menunggu Data / Player Tidak Aktif...</div>
+
+    <div class="overlay-container" id="playerOverlay">
+        <div id="floatingTextContainer"></div> <div class="header">
+            <div class="char-info">
+                <h2 id="uiName">Loading...</h2>
+                <p>Lv. <span id="uiLevel">1</span> <span id="uiClass">Loading...</span></p>
+            </div>
+            <div class="ac-badge">
+                <span class="ac-label">AC</span>
+                <span class="ac-value" id="uiAC">10</span>
+            </div>
+        </div>
+
+        <div class="hp-section">
+            <div class="hp-text"><span id="uiCurrentHP">0</span> / <span id="uiMaxHP">0</span></div>
+            <div class="hp-bar-bg">
+                <div class="hp-bar-fill" id="uiHpBar"></div>
+            </div>
+        </div>
+
+        <div id="uiConditions"></div> </div>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const playerId = urlParams.get('id') || 'p1';
+    const roomId = urlParams.get('room') || 'default';
+    const storageKey = 'dnd_session_data_' + roomId;
+    let previousHPs = {}; 
+
+    function updateUI() {
+        const rawData = localStorage.getItem(storageKey);
+        if (!rawData) return;
+
+        const sessionData = JSON.parse(rawData);
+        const player = sessionData.find(p => p.id === playerId);
+
+        const overlay = document.getElementById('playerOverlay');
+        const errorMsg = document.getElementById('errorMsg');
+
+        if (!player || !player.active) {
+            overlay.style.display = 'none';
+            errorMsg.style.display = 'block';
+            return;
+        }
+
+        overlay.style.display = 'block';
+        errorMsg.style.display = 'none';
+
+        document.getElementById('uiName').innerText = player.name;
+        document.getElementById('uiClass').innerText = player.className;
+        document.getElementById('uiLevel').innerText = player.level || 1; 
+        document.getElementById('uiAC').innerText = player.ac;
+        
+        const prevHP = previousHPs[playerId];
+        const currentHP = player.hp;
+        if (prevHP !== undefined && prevHP !== currentHP) {
+            triggerFloatingText(currentHP - prevHP);
+        }
+        previousHPs[playerId] = currentHP; 
+
+        document.getElementById('uiCurrentHP').innerText = currentHP;
+        document.getElementById('uiMaxHP').innerText = player.maxHp;
+
+        let hpPercent = (currentHP / player.maxHp) * 100;
+        if (hpPercent < 0) hpPercent = 0;
+        if (hpPercent > 100) hpPercent = 100;
+
+        const hpBar = document.getElementById('uiHpBar');
+        const overlayContainer = document.getElementById('playerOverlay');
+        hpBar.style.width = hpPercent + '%';
+
+        if (hpPercent <= 25) {
+            hpBar.style.background = 'linear-gradient(to bottom, #8a0303 0%, #300000 100%)'; 
+            overlayContainer.classList.add('critical-glow'); 
+        } else {
+            hpBar.style.background = 'linear-gradient(to bottom, var(--hp-red-light) 0%, var(--hp-red) 50%, #4a0000 100%)';
+            overlayContainer.classList.remove('critical-glow');
+        }
+
+        const conditionsContainer = document.getElementById('uiConditions');
+        conditionsContainer.innerHTML = ''; 
+        if (player.conditions && player.conditions.length > 0) {
+            player.conditions.forEach(cond => {
+                const badge = document.createElement('div');
+                badge.className = `condition-badge condition-${cond.toLowerCase()}`;
+                badge.innerText = cond;
+                conditionsContainer.appendChild(badge);
+            });
+        }
+    }
+
+    function triggerFloatingText(diff) {
+        const container = document.getElementById('floatingTextContainer');
+        const textElement = document.createElement('div');
+        textElement.className = 'floating-text ' + (diff > 0 ? 'heal' : 'damage');
+        textElement.innerText = (diff > 0 ? '+' : '') + diff;
+        container.appendChild(textElement);
+    }
+
+    const initialRawData = localStorage.getItem(storageKey);
+    if(initialRawData) {
+        const initialSessionData = JSON.parse(initialRawData);
+        const initialPlayer = initialSessionData.find(p => p.id === playerId);
+        if(initialPlayer) {
+            previousHPs[playerId] = initialPlayer.hp;
+        }
+    }
+
+    updateUI();
+
+    window.addEventListener('storage', function(e) {
+        if (e.key === storageKey) {
+            updateUI();
+        }
+    });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player Controller</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Cormorant+Garamond:wght@600&display=swap');
+
+        :root {
+            --gold-light: #d4af37;
+            --gold-dark: #8b7348;
+            --bg-texture: linear-gradient(135deg, #1c140d 0%, #0a0705 100%);
+            --panel-bg: linear-gradient(145deg, #2a2118, #1a140f);
+        }
+
+        body {
+            font-family: 'Cormorant Garamond', serif;
+            background: var(--bg-texture);
+            color: #dcdde1;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .remote-container {
+            background: var(--panel-bg);
+            width: 100%;
+            max-width: 400px;
+            border-radius: 8px;
+            padding: 25px;
+            border: 3px solid #5c4a2e;
+            border-top-color: var(--gold-dark);
+            border-left-color: var(--gold-dark);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.9), inset 0 0 20px rgba(0,0,0,0.8);
+            text-align: center;
+            position: relative;
+        }
+
+        .remote-container::before {
+            content: '';
+            position: absolute;
+            top: -6px; left: -6px; right: -6px; bottom: -6px;
+            border: 1px solid var(--gold-dark);
+            pointer-events: none;
+            opacity: 0.5;
+        }
+
+        .header h1 {
+            margin: 0;
+            color: var(--gold-light);
+            font-family: 'Cinzel', serif;
+            font-size: 2rem;
+            text-shadow: 2px 2px 4px #000;
+        }
+
+        .header p {
+            margin: 5px 0 20px 0;
+            color: #bdc3c7;
+            font-size: 1.2rem;
+            font-style: italic;
+        }
+
+        .ac-badge {
+            display: inline-block;
+            background: radial-gradient(circle, #5e4726 0%, #2a1f11 100%);
+            border: 2px solid var(--gold-dark);
+            padding: 8px 20px;
+            border-radius: 30px;
+            font-family: 'Cinzel', serif;
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.9);
+            color: #fff;
+        }
+
+        .stat-box {
+            background: #110d0a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            border: 1px solid var(--gold-dark);
+            box-shadow: inset 0 5px 15px rgba(0,0,0,0.9);
+        }
+
+        .stat-box div {
+            font-family: 'Cinzel', serif;
+            color: var(--gold-light);
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+        }
+
+        .stat-box h2 {
+            margin: 0;
+            font-family: 'Cinzel', serif;
+            font-size: 3.5rem;
+            color: #ff4757;
+            text-shadow: 2px 2px 5px #000;
+        }
+
+        .stat-box h2 span.max {
+            font-size: 1.5rem;
+            color: #8395a7;
+        }
+
+        #ctrlConditions {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1rem;
+            color: #e67e22; /* Warna orange untuk kondisi agar menonjol */
+            font-weight: bold;
+            margin-bottom: 20px;
+            border-top: 1px solid #3d2e18;
+            padding-top: 10px;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        button {
+            padding: 20px;
+            font-size: 1.5rem;
+            font-family: 'Cinzel', serif;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.1s, filter 0.2s;
+            color: white;
+            text-shadow: 1px 1px 3px #000;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.7), inset 0 2px 5px rgba(255,255,255,0.2);
+        }
+
+        button:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.7), inset 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        .btn-dmg-large { background: linear-gradient(to bottom, #8a0303, #4a0000); border: 2px solid #ff3333; }
+        .btn-dmg-small { background: linear-gradient(to bottom, #b32d2d, #701111); border: 1px solid #e74c3c; font-size: 1.2rem; }
+        
+        .btn-heal-large { background: linear-gradient(to bottom, #1e5631, #0a2e15); border: 2px solid #4caf50; }
+        .btn-heal-small { background: linear-gradient(to bottom, #2d8047, #134d26); border: 1px solid #2ecc71; font-size: 1.2rem; }
+
+        #errorMsg {
+            color: #ff4757;
+            font-family: 'Cinzel', serif;
+            font-weight: bold;
+            display: none;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border: 2px solid #ff4757;
+            border-radius: 8px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="remote-container" id="remoteController">
+        <div class="header">
+            <h1 id="ctrlName">Loading...</h1>
+            <p>Lv. <span id="ctrlLevel">1</span> <span id="ctrlClass">Loading...</span></p>
+        </div>
+
+        <div class="ac-badge">🛡️ AC <span id="ctrlAC">10</span></div>
+
+        <div class="stat-box">
+            <div>Current HP</div>
+            <h2><span id="ctrlCurrentHP">0</span> <span class="max">/ <span id="ctrlMaxHP">0</span></span></h2>
+        </div>
+
+        <div id="ctrlConditions">Kondisi: Normal</div> <div class="controls-grid">
+            <button class="btn-dmg-large" onclick="modifyHP(-5)">-5 HP</button>
+            <button class="btn-heal-large" onclick="modifyHP(5)">+5 HP</button>
+            <button class="btn-dmg-small" onclick="modifyHP(-1)">-1 HP</button>
+            <button class="btn-heal-small" onclick="modifyHP(1)">+1 HP</button>
+        </div>
+    </div>
+
+    <div id="errorMsg">
+        <h2>Akses Ditolak</h2>
+        <p>Player tidak ditemukan atau sedang dinonaktifkan oleh GM.</p>
+    </div>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const playerId = urlParams.get('id') || 'p1';
+    const roomId = urlParams.get('room') || 'default';
+    const storageKey = 'dnd_session_data_' + roomId;
+
+    function loadData() {
+        const rawData = localStorage.getItem(storageKey);
+        if (!rawData) return null;
+        return JSON.parse(rawData);
+    }
+
+    function updateUI() {
+        const sessionData = loadData();
+        const player = sessionData ? sessionData.find(p => p.id === playerId) : null;
+
+        const remote = document.getElementById('remoteController');
+        const errorMsg = document.getElementById('errorMsg');
+
+        if (!player || !player.active) {
+            remote.style.display = 'none';
+            errorMsg.style.display = 'block';
+            return;
+        }
+
+        remote.style.display = 'block';
+        errorMsg.style.display = 'none';
+
+        document.getElementById('ctrlName').innerText = player.name;
+        document.getElementById('ctrlClass').innerText = player.className;
+        document.getElementById('ctrlLevel').innerText = player.level || 1;
+        document.getElementById('ctrlAC').innerText = player.ac;
+        
+        document.getElementById('ctrlCurrentHP').innerText = player.hp;
+        document.getElementById('ctrlMaxHP').innerText = player.maxHp;
+
+        const conditionsText = document.getElementById('ctrlConditions');
+        if (player.conditions && player.conditions.length > 0) {
+            conditionsText.innerText = "Kondisi: " + player.conditions.join(', ');
+        } else {
+            conditionsText.innerText = "Kondisi: Normal";
+        }
+    }
+
+    function modifyHP(amount) {
+        const sessionData = loadData();
+        if (!sessionData) return;
+
+        const playerIndex = sessionData.findIndex(p => p.id === playerId);
+        if (playerIndex === -1 || !sessionData[playerIndex].active) return;
+
+        let newHP = sessionData[playerIndex].hp + amount;
+        if (newHP < 0) newHP = 0;
+        if (newHP > sessionData[playerIndex].maxHp) newHP = sessionData[playerIndex].maxHp;
+        
+        sessionData[playerIndex].hp = newHP;
+        localStorage.setItem(storageKey, JSON.stringify(sessionData));
+
+        updateUI();
+    }
+
+    updateUI();
+
+    window.addEventListener('storage', function(e) {
+        if (e.key === storageKey) {
+            updateUI();
+        }
+    });
+</script>
+
+</body>
+</html>
