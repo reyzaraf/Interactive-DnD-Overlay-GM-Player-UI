@@ -28,20 +28,27 @@
         <h1 id="sceneTitle">Loading...</h1>
         <p id="sceneSubtitle">Loading...</p>
     </div>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script>
     const urlParams = new URLSearchParams(window.location.search);
     const roomId = urlParams.get('room') || 'default';
-    const peerHostId = 'farka-dnd-' + roomId;
-
-    const peer = new Peer(); 
     
-    peer.on('open', () => {
-        const conn = peer.connect(peerHostId);
-        conn.on('data', (msg) => {
-            if (msg.type === 'SYNC') {
-                updateScene(msg.scene);
-            }
-        });
+    const syncTopic = 'farka-dnd-room-' + roomId + '/sync';
+    const actionTopic = 'farka-dnd-room-' + roomId + '/action';
+
+    const client = mqtt.connect('wss://broker.hivemq.com:8000/mqtt');
+
+    client.on('connect', () => {
+        client.subscribe(syncTopic);
+        // Teriak minta data scene ke GM
+        client.publish(actionTopic, JSON.stringify({ type: 'REQUEST_SYNC' }));
+    });
+
+    client.on('message', (topic, message) => {
+        if (topic === syncTopic) {
+            const data = JSON.parse(message.toString());
+            updateScene(data.scene);
+        }
     });
 
     function updateScene(data) {

@@ -65,70 +65,54 @@
             <p style="color:#888; font-size:0.8rem;">*GM yang bisa me-reset / memulihkan HP-mu</p>
         </div>
     </div>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script>
     const urlParams = new URLSearchParams(window.location.search);
     const playerId = urlParams.get('id') || 'p1';
     const roomId = urlParams.get('room') || 'default';
-    const peerHostId = 'farka-dnd-' + roomId;
+    
+    const syncTopic = 'farka-dnd-room-' + roomId + '/sync';
+    const actionTopic = 'farka-dnd-room-' + roomId + '/action';
 
     let sessionDataCache = null;
-    let conn; 
-    let peer;
 
     // ==========================================
-    // SISTEM PEER JS (KLIEN PLAYER) DENGAN AUTO RECONNECT
+    // SISTEM PUBLIC MQTT (KLIEN PLAYER)
     // ==========================================
     const errorMsg = document.getElementById('errorMsg');
-    const peerOptions = { config: { 'iceServers': [ { urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' } ] } };
+    errorMsg.innerText = "⏳ Menghubungkan ke Relay (Room: " + roomId + ")...";
+    errorMsg.style.display = 'block';
 
-    function connectToServer() {
-        errorMsg.innerText = "⏳ Menghubungkan ke GM (Room: " + roomId + ")...";
+    const client = mqtt.connect('wss://broker.hivemq.com:8000/mqtt');
+
+    client.on('connect', () => {
+        errorMsg.style.display = 'none';
+        
+        // Dengarkan siaran data dari GM
+        client.subscribe(syncTopic);
+        
+        // Teriak minta data pertama kali ke GM
+        client.publish(actionTopic, JSON.stringify({ type: 'REQUEST_SYNC' }));
+    });
+
+    client.on('message', (topic, message) => {
+        if (topic === syncTopic) {
+            const data = JSON.parse(message.toString());
+            sessionDataCache = data.session;
+            updateUI();
+        }
+    });
+
+    client.on('error', () => {
+        errorMsg.innerText = "❌ Koneksi Relay terputus!";
         errorMsg.style.display = 'block';
-
-        peer = new Peer(peerOptions);
-
-        peer.on('open', () => {
-            conn = peer.connect(peerHostId, { reliable: true });
-            
-            conn.on('open', () => {
-                errorMsg.style.display = 'none'; 
-            });
-
-            conn.on('data', (msg) => {
-                if (msg.type === 'SYNC') {
-                    sessionDataCache = msg.session;
-                    updateUI();
-                }
-            });
-
-            conn.on('close', () => {
-                errorMsg.innerText = "❌ Terputus dari GM. Mencoba menyambung kembali...";
-                errorMsg.style.display = 'block';
-                setTimeout(reconnect, 3000);
-            });
-        });
-
-        peer.on('error', (err) => {
-            errorMsg.innerText = "❌ Gagal terhubung ke GM. Mencari ualng...";
-            errorMsg.style.display = 'block';
-            setTimeout(reconnect, 3000);
-        });
-    }
-
-    function reconnect() {
-        if(peer) peer.destroy();
-        connectToServer();
-    }
-
-    // Mulai koneksi pertama kali
-    connectToServer();
+    });
     // ==========================================
 
     function updateUI() {
         if(!sessionDataCache) return;
         const player = sessionDataCache.find(p => p.id === playerId);
-        if (!player || !player.active) { document.body.innerHTML = "<h2 style='color:red;'>Player Tidak Aktif</h2>"; return; }
+        if (!player || !player.active) { document.body.innerHTML = "<h2 style='color:red;'>Player Tidak Aktif / Tunggu GM buka Dashboard</h2>"; return; }
 
         document.getElementById('ctrlName').innerText = player.name;
         document.getElementById('ctrlLevel').innerText = player.level;
@@ -153,20 +137,17 @@
         }
     }
 
+    // Mengirim Aksi ke GM
     function modifyHP(amount) {
-        if (conn && conn.open) {
-            conn.send({ type: 'ACTION', action: 'MODIFY_HP', playerId: playerId, amount: amount });
-        } else {
-            alert("Terputus dari GM! Sedang mencoba menyambung ulang...");
-        }
+        client.publish(actionTopic, JSON.stringify({ 
+            type: 'ACTION', action: 'MODIFY_HP', playerId: playerId, amount: amount 
+        }));
     }
 
     function addDeathSave(type) {
-        if (conn && conn.open) {
-            conn.send({ type: 'ACTION', action: 'DEATH_SAVE', playerId: playerId, saveType: type });
-        } else {
-            alert("Terputus dari GM! Sedang mencoba menyambung ulang...");
-        }
+        client.publish(actionTopic, JSON.stringify({ 
+            type: 'ACTION', action: 'DEATH_SAVE', playerId: playerId, saveType: type 
+        }));
     }
 </script>
 </body>

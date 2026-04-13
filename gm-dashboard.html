@@ -68,13 +68,16 @@
     <div class="grid-container" id="gmGrid"></div>
 
     <button class="btn-reset" onclick="resetAll()">Reset Semua Data</button>
-<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script>
-const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = new URLSearchParams(window.location.search);
     const roomId = urlParams.get('room') || 'default';
     const roomKey = 'dnd_session_' + roomId;
     const sceneKey = 'dnd_scene_' + roomId;
-    const peerHostId = 'farka-dnd-' + roomId; 
+    
+    // Topik unik agar tidak bentrok dengan orang lain di server publik
+    const syncTopic = 'farka-dnd-room-' + roomId + '/sync';
+    const actionTopic = 'farka-dnd-room-' + roomId + '/action';
 
     const allConditions = ["Blinded", "Charmed", "Deafened", "Frightened", "Grappled", "Incapacitated", "Invisible", "Paralyzed", "Petrified", "Poisoned", "Prone", "Restrained", "Stunned", "Unconscious"];
 
@@ -86,53 +89,48 @@ const urlParams = new URLSearchParams(window.location.search);
     let sessionData = JSON.parse(localStorage.getItem(roomKey)) || defaultData;
     sessionData = sessionData.map(p => ({ ...p, level: p.level || 1, conditions: p.conditions || [], initiative: p.initiative || 0, isTurn: p.isTurn || false, deathSaves: p.deathSaves || { success: 0, fail: 0 } }));
 
-    document.querySelector('h1').innerHTML = `D&D GM Dashboard <br><span id="serverStatus" style="font-size: 1rem; color: #f39c12;">⏳ Menyiapkan Server Room: ${roomId}...</span>`;
+    document.querySelector('h1').innerHTML = `D&D GM Dashboard <br><span id="serverStatus" style="font-size: 1rem; color: #f39c12;">⏳ Menghubungkan ke Relay Server...</span>`;
 
     // ==========================================
-    // SISTEM PEER JS (SERVER HOST) DENGAN STUN GOOGLE
+    // SISTEM PUBLIC MQTT (PENGGANTI FIREBASE & PEERJS)
     // ==========================================
-    const peerOptions = {
-        config: { 'iceServers': [ { urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' } ] }
-    };
-    
-    let peer = new Peer(peerHostId, peerOptions);
-    let connectedClients = [];
+    const client = mqtt.connect('wss://broker.hivemq.com:8000/mqtt');
 
-    peer.on('open', (id) => {
-        document.getElementById('serverStatus').innerHTML = `🌐 Server Online (Room: ${roomId})`;
+    client.on('connect', () => {
+        document.getElementById('serverStatus').innerHTML = `🌐 Sinyal Online (Room: ${roomId})`;
         document.getElementById('serverStatus').style.color = '#2ecc71';
-    });
-
-    peer.on('error', (err) => {
-        document.getElementById('serverStatus').innerHTML = `❌ Error/Terputus: Refresh Halaman!`;
-        document.getElementById('serverStatus').style.color = '#e74c3c';
-        console.error(err);
-    });
-
-    peer.on('connection', (conn) => {
-        conn.on('open', () => {
-            connectedClients.push(conn);
-            broadcastState(); // Langsung kirim data saat klien berhasil masuk
-        });
         
-        conn.on('data', (data) => {
-            if (data.type === 'ACTION') handlePlayerAction(data);
-        });
-
-        conn.on('close', () => {
-            connectedClients = connectedClients.filter(c => c.peer !== conn.peer);
-        });
+        // Dengarkan aksi dari player
+        client.subscribe(actionTopic);
+        
+        // Langsung siarkan data saat GM pertama kali buka
+        broadcastState();
     });
 
-    // Membersihkan koneksi yang nyangkut (Stale connections) setiap 5 detik
-    setInterval(() => {
-        connectedClients = connectedClients.filter(c => c.open);
-    }, 5000);
+    client.on('message', (topic, message) => {
+        if (topic === actionTopic) {
+            const data = JSON.parse(message.toString());
+            
+            // Jika ada player/overlay yang baru masuk dan minta data
+            if (data.type === 'REQUEST_SYNC') {
+                broadcastState();
+            } 
+            // Jika player pencet tombol darah/death save
+            else if (data.type === 'ACTION') {
+                handlePlayerAction(data);
+            }
+        }
+    });
+
+    client.on('error', (error) => {
+        document.getElementById('serverStatus').innerHTML = `❌ Terputus dari Relay Server`;
+        document.getElementById('serverStatus').style.color = '#e74c3c';
+    });
 
     function broadcastState() {
         const sceneData = JSON.parse(localStorage.getItem(sceneKey)) || {title: '', subtitle: ''};
-        const payload = { type: 'SYNC', session: sessionData, scene: sceneData };
-        connectedClients.forEach(c => { if(c.open) c.send(payload); });
+        const payload = JSON.stringify({ session: sessionData, scene: sceneData });
+        client.publish(syncTopic, payload);
     }
 
     function handlePlayerAction(data) {
@@ -149,6 +147,8 @@ const urlParams = new URLSearchParams(window.location.search);
             if(data.saveType === 'success' && sessionData[idx].deathSaves.success < 3) sessionData[idx].deathSaves.success++;
             if(data.saveType === 'fail' && sessionData[idx].deathSaves.fail < 3) sessionData[idx].deathSaves.fail++;
         }
+        
+        // Simpan ke laptop GM, lalu otomatis siarkan ke semua layar
         saveData(); 
     }
     // ==========================================
