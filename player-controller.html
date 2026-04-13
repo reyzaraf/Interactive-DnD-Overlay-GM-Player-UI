@@ -9,63 +9,62 @@
         :root { --gold-light: #d4af37; --gold-dark: #8b7348; --bg-texture: linear-gradient(135deg, #1c140d 0%, #0a0705 100%); --panel-bg: linear-gradient(145deg, #2a2118, #1a140f); }
         body { font-family: 'Cormorant Garamond', serif; background: var(--bg-texture); color: #dcdde1; margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
         .remote-container { background: var(--panel-bg); width: 100%; max-width: 400px; border-radius: 8px; padding: 25px; border: 3px solid #5c4a2e; text-align: center; position: relative; box-shadow: 0 15px 30px rgba(0,0,0,0.9); transition: all 0.5s; }
-        .remote-container.is-dying { background: linear-gradient(145deg, #300000, #110000); border-color: #ff3333; box-shadow: inset 0 0 50px rgba(255,0,0,0.5); }
+        .remote-container.is-dying { background: #300000; border-color: #ff3333; box-shadow: inset 0 0 50px rgba(255,0,0,0.5); }
         .header h1 { margin: 0; color: var(--gold-light); font-family: 'Cinzel', serif; font-size: 2rem; }
         .header p { margin: 5px 0 20px 0; color: #bdc3c7; font-size: 1.2rem; font-style: italic; }
         .turn-badge { display:none; background:#f1c40f; color:#000; font-family:'Cinzel',serif; font-weight:bold; padding:5px 15px; border-radius:20px; margin-bottom:15px; }
-        
         .stat-box { background: #110d0a; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid var(--gold-dark); }
-        .stat-box div { font-family: 'Cinzel', serif; color: var(--gold-light); font-size: 1.1rem; }
         .stat-box h2 { margin: 0; font-family: 'Cinzel', serif; font-size: 3.5rem; color: #ff4757; }
-        #ctrlConditions { font-family: 'Cormorant Garamond', serif; color: #e67e22; font-weight: bold; margin-bottom: 20px; border-top: 1px solid #3d2e18; padding-top: 10px; }
-        
-        /* HP Controls */
         .controls-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        button { padding: 20px; font-size: 1.5rem; font-family: 'Cinzel', serif; font-weight: bold; border-radius: 8px; cursor: pointer; color: white; box-shadow: 0 6px 12px rgba(0,0,0,0.7); }
-        button:active { transform: translateY(4px); }
+        button { padding: 15px; font-size: 1.2rem; font-family: 'Cinzel', serif; font-weight: bold; border-radius: 8px; cursor: pointer; color: white; border: none; box-shadow: 0 4px 8px rgba(0,0,0,0.5); }
         .btn-dmg-large { background: linear-gradient(to bottom, #8a0303, #4a0000); border: 2px solid #ff3333; }
         .btn-heal-large { background: linear-gradient(to bottom, #1e5631, #0a2e15); border: 2px solid #4caf50; }
-
-        /* Death Saves Controls */
         .death-controls { display: none; margin-top: 20px; }
         .is-dying .death-controls { display: block; }
         .is-dying .controls-grid { display: none; }
-        .ds-score { font-family: 'Cinzel', serif; font-size: 1.5rem; color: white; margin-bottom: 15px; display:flex; justify-content: space-around;}
-        .btn-ds-succ { background: linear-gradient(to bottom, #2ecc71, #145a32); width:100%; border: 2px solid #2ecc71; margin-bottom:10px; }
-        .btn-ds-fail { background: linear-gradient(to bottom, #000, #222); width:100%; border: 2px solid #555; }
-        
-        #errorMsg { display: none; color: #f39c12; font-family: 'Cinzel', serif; margin-bottom: 10px; }
+        #pinOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-texture); z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .pin-box { background: var(--panel-bg); padding: 30px; border-radius: 8px; border: 2px solid var(--gold-dark); text-align: center; }
+        .pin-box input { width: 100%; padding: 10px; font-size: 1.5rem; text-align: center; background: #000; color: var(--gold-light); border: 1px solid var(--gold-dark); margin: 15px 0; }
+        #errorMsg { color: #ff4757; font-weight: bold; margin-bottom: 10px; display: none; }
+        #loadingMsg { color: var(--gold-light); font-family: 'Cinzel'; }
     </style>
 </head>
 <body>
-    <div class="remote-container" id="remoteController">
-        <div id="errorMsg">⏳ Menghubungkan...</div>
-        <div class="turn-badge" id="turnBadge">🔥 GILIRANMU! 🔥</div>
-        <div class="header"><h1 id="ctrlName">Loading...</h1><p>Lv. <span id="ctrlLevel">1</span> | AC <span id="ctrlAC">10</span></p></div>
 
+    <div id="pinOverlay" style="display: none;">
+        <div class="pin-box">
+            <h2 style="font-family: 'Cinzel'; color: var(--gold-light);">Keamanan Sesi</h2>
+            <p id="pinInstruction">Masukkan PIN untuk mengontrol karakter</p>
+            <input type="password" id="inputPin" placeholder="PIN">
+            <button class="btn-heal-large" style="width: 100%;" onclick="validatePin()">Masuk Sesi</button>
+        </div>
+    </div>
+
+    <div class="remote-container" id="remoteController" style="display: none;">
+        <div id="loadingMsg">⏳ Mengamankan Slot...</div>
+        <div class="turn-badge" id="turnBadge">🔥 GILIRANMU! 🔥</div>
+        <div class="header">
+            <h1 id="ctrlName">---</h1>
+            <p>Lv. <span id="ctrlLevel">-</span> | AC <span id="ctrlAC">-</span></p>
+        </div>
         <div class="stat-box" id="hpBox">
             <div id="hpLabel">Current HP</div>
             <h2><span id="ctrlCurrentHP">0</span> <span style="font-size:1.5rem; color:#888;">/ <span id="ctrlMaxHP">0</span></span></h2>
         </div>
-
-        <div id="ctrlConditions">Kondisi: Normal</div>
-
         <div class="controls-grid">
             <button class="btn-dmg-large" onclick="modifyHP(-5)">-5 HP</button>
             <button class="btn-heal-large" onclick="modifyHP(5)">+5 HP</button>
-            <button class="btn-dmg-large" style="font-size:1.2rem" onclick="modifyHP(-1)">-1 HP</button>
-            <button class="btn-heal-large" style="font-size:1.2rem" onclick="modifyHP(1)">+1 HP</button>
+            <button class="btn-dmg-large" onclick="modifyHP(-1)">-1 HP</button>
+            <button class="btn-heal-large" onclick="modifyHP(1)">+1 HP</button>
         </div>
-
         <div class="death-controls">
             <h3 style="color:#ff3333; font-family:'Cinzel', serif;">DEATH SAVES</h3>
-            <div class="ds-score">
-                <span style="color:#2ecc71">Sukses: <span id="dsSuccScore">0</span></span>
-                <span style="color:#e74c3c">Gagal: <span id="dsFailScore">0</span></span>
+            <div style="margin-bottom: 10px;">
+                <span style="color:#2ecc71">S: <span id="dsSuccScore">0</span></span> | 
+                <span style="color:#e74c3c">G: <span id="dsFailScore">0</span></span>
             </div>
-            <button class="btn-ds-succ" onclick="addDeathSave('success')">Roll Sukses</button>
-            <button class="btn-ds-fail" onclick="addDeathSave('fail')">Roll Gagal</button>
-            <p style="color:#888; font-size:0.8rem;">*GM yang bisa me-reset / memulihkan HP-mu</p>
+            <button class="btn-ds-succ" style="background: #2ecc71" onclick="addDeathSave('success')">Roll Sukses</button>
+            <button class="btn-ds-fail" style="background: #c0392b" onclick="addDeathSave('fail')">Roll Gagal</button>
         </div>
     </div>
 
@@ -74,36 +73,104 @@
     document.addEventListener('DOMContentLoaded', function() {
         const urlParams = new URLSearchParams(window.location.search);
         const roomId = urlParams.get('room') || 'default';
-        const key = urlParams.get('key') || '';
-        const myPin = atob(key); // Decode PIN
         const playerId = urlParams.get('id') || 'p1';
+        const urlKey = urlParams.get('key') || '';
+        
+        let myPin = "";
+        if (urlKey) { try { myPin = atob(urlKey); } catch(e) {} }
 
         const syncTopic = 'campaign-dnd-room-' + roomId + '/sync';
         const actionTopic = 'campaign-dnd-room-' + roomId + '/action';
+        const playerGuardTopic = 'campaign-dnd-room-' + roomId + '/guard/' + playerId;
+
+        // PERBAIKAN: Gunakan sessionStorage agar ID tetap sama setelah refresh
+        let myInstanceId = sessionStorage.getItem('dnd_instance_id_' + roomId + '_' + playerId);
+        if (!myInstanceId) {
+            myInstanceId = Math.random().toString(36).substr(2, 9);
+            sessionStorage.setItem('dnd_instance_id_' + roomId + '_' + playerId, myInstanceId);
+        }
 
         const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
         let sessionDataCache = null;
+        let isSlotOwner = false;
+
+        if (!myPin) {
+            document.getElementById('pinOverlay').style.display = 'flex';
+        } else {
+            document.getElementById('remoteController').style.display = 'block';
+        }
 
         client.on('connect', () => {
             client.subscribe(syncTopic);
-            // Kirim request sync yang menyertakan PIN
-            client.publish(actionTopic, JSON.stringify({ type: 'REQUEST_SYNC', pin: myPin }));
+            client.subscribe(playerGuardTopic);
+            
+            // Cek apakah slot sudah ada pemiliknya
+            client.publish(playerGuardTopic, JSON.stringify({ type: 'PLAYER_CHECK', id: myInstanceId }));
+            
+            setTimeout(() => {
+                if (!isSlotOwner) {
+                    isSlotOwner = true;
+                    document.getElementById('loadingMsg').innerText = "Sesi Terhubung.";
+                    requestSync();
+                }
+            }, 1000);
         });
 
         client.on('message', (topic, message) => {
             const data = JSON.parse(message.toString());
-            // VALIDASI: Hanya terima data jika PIN dari GM cocok dengan link kita
-            if (data.pin !== myPin) {
-                document.body.innerHTML = "<h2 style='color:red; text-align:center;'>❌ AKSES DITOLAK: PIN SALAH / LINK TIDAK VALID</h2>";
+
+            if (topic === playerGuardTopic) {
+                // Hanya respon jika ID berbeda (artinya benar-benar perangkat/sesi lain)
+                if (data.id !== myInstanceId) {
+                    if (data.type === 'PLAYER_CHECK' && isSlotOwner) {
+                        client.publish(playerGuardTopic, JSON.stringify({ type: 'PLAYER_OCCUPIED', id: myInstanceId }));
+                    } else if (data.type === 'PLAYER_OCCUPIED') {
+                        alert("SLOT INI SEDANG DIGUNAKAN DI TAB ATAU PERANGKAT LAIN!");
+                        window.location.href = 'index.html';
+                    }
+                }
                 return;
             }
-            sessionDataCache = data.session;
-            updateUI();
+
+            if (topic === syncTopic) {
+                if (!myPin) return;
+                if (data.pin !== myPin) {
+                    document.getElementById('pinInstruction').innerText = "PIN Salah!";
+                    document.getElementById('pinOverlay').style.display = 'flex';
+                    document.getElementById('remoteController').style.display = 'none';
+                    return;
+                }
+                sessionDataCache = data.session;
+                updateUI();
+            }
         });
 
+        window.validatePin = function() {
+            const input = document.getElementById('inputPin').value;
+            if (input) {
+                myPin = input;
+                document.getElementById('pinOverlay').style.display = 'none';
+                document.getElementById('remoteController').style.display = 'block';
+                requestSync();
+            }
+        };
+
+        function requestSync() {
+            if (client.connected && myPin && isSlotOwner) {
+                client.publish(actionTopic, JSON.stringify({ type: 'REQUEST_SYNC', pin: myPin }));
+            }
+        }
+
         function updateUI() {
+            if (!sessionDataCache || !isSlotOwner) return;
             const player = sessionDataCache.find(p => p.id === playerId);
-            if (!player || !player.active) return;
+            if (!player || !player.active) {
+                document.getElementById('loadingMsg').innerText = "Player belum aktif di Dashboard GM";
+                document.getElementById('loadingMsg').style.display = 'block';
+                return;
+            }
+
+            document.getElementById('loadingMsg').style.display = 'none';
             document.getElementById('ctrlName').innerText = player.name;
             document.getElementById('ctrlCurrentHP').innerText = player.hp;
             document.getElementById('ctrlMaxHP').innerText = player.maxHp;
@@ -112,21 +179,25 @@
             document.getElementById('turnBadge').style.display = player.isTurn ? 'block' : 'none';
             
             const remote = document.getElementById('remoteController');
-            if (player.hp <= 0) {
-                remote.classList.add('is-dying');
+            if (player.hp <= 0 && player.maxHp > 0) { remote.classList.add('is-dying'); } 
+            else { remote.classList.remove('is-dying'); }
+            
+            if (player.deathSaves) {
                 document.getElementById('dsSuccScore').innerText = player.deathSaves.success;
                 document.getElementById('dsFailScore').innerText = player.deathSaves.fail;
-            } else {
-                remote.classList.remove('is-dying');
             }
         }
 
         window.modifyHP = function(amt) {
-            client.publish(actionTopic, JSON.stringify({ type: 'ACTION', action: 'MODIFY_HP', playerId, amount: amt, pin: myPin }));
+            if (client.connected && myPin && isSlotOwner) {
+                client.publish(actionTopic, JSON.stringify({ type: 'ACTION', action: 'MODIFY_HP', playerId, amount: amt, pin: myPin }));
+            }
         };
 
         window.addDeathSave = function(type) {
-            client.publish(actionTopic, JSON.stringify({ type: 'ACTION', action: 'DEATH_SAVE', playerId, saveType: type, pin: myPin }));
+            if (client.connected && myPin && isSlotOwner) {
+                client.publish(actionTopic, JSON.stringify({ type: 'ACTION', action: 'DEATH_SAVE', playerId, saveType: type, pin: myPin }));
+            }
         };
     });
 </script>
