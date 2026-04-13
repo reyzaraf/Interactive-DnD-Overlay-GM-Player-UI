@@ -69,13 +69,49 @@
     const urlParams = new URLSearchParams(window.location.search);
     const playerId = urlParams.get('id') || 'p1';
     const roomId = urlParams.get('room') || 'default';
-    const storageKey = 'dnd_session_data_' + roomId;
+    const peerHostId = 'farka-dnd-' + roomId;
 
-    function loadData() { return JSON.parse(localStorage.getItem(storageKey)); }
+    let sessionDataCache = null;
+    let conn; // Koneksi ke GM
+
+    // ==========================================
+    // SISTEM PEER JS (KLIEN PLAYER)
+    // ==========================================
+    const peer = new Peer(); 
+    const errorMsg = document.getElementById('errorMsg');
+    
+    errorMsg.innerText = "⏳ Menghubungkan ke GM (Room: " + roomId + ")...";
+    errorMsg.style.display = 'block';
+
+    peer.on('open', () => {
+        conn = peer.connect(peerHostId);
+        
+        conn.on('open', () => {
+            errorMsg.style.display = 'none'; // Sembunyikan pesan loading
+        });
+
+        conn.on('data', (msg) => {
+            if (msg.type === 'SYNC') {
+                sessionDataCache = msg.session;
+                updateUI();
+            }
+        });
+
+        conn.on('close', () => {
+            errorMsg.innerText = "❌ Koneksi ke GM terputus. Pastikan GM membuka dashboard.";
+            errorMsg.style.display = 'block';
+        });
+    });
+
+    peer.on('error', (err) => {
+        errorMsg.innerText = "❌ Gagal terhubung: Pastikan GM Dashboard sudah online!";
+        errorMsg.style.display = 'block';
+    });
+    // ==========================================
 
     function updateUI() {
-        const sessionData = loadData();
-        const player = sessionData ? sessionData.find(p => p.id === playerId) : null;
+        if(!sessionDataCache) return;
+        const player = sessionDataCache.find(p => p.id === playerId);
         if (!player || !player.active) { document.body.innerHTML = "<h2 style='color:red;'>Player Tidak Aktif</h2>"; return; }
 
         document.getElementById('ctrlName').innerText = player.name;
@@ -89,7 +125,6 @@
         if (player.conditions && player.conditions.length > 0) document.getElementById('ctrlConditions').innerText = "Kondisi: " + player.conditions.join(', ');
         else document.getElementById('ctrlConditions').innerText = "Kondisi: Normal";
 
-        // Cek Sekarat
         const remote = document.getElementById('remoteController');
         if (player.hp <= 0 && player.maxHp > 0) {
             remote.classList.add('is-dying');
@@ -102,31 +137,22 @@
         }
     }
 
+    // Mengirim Action ke Server GM
     function modifyHP(amount) {
-        const sessionData = loadData();
-        const idx = sessionData.findIndex(p => p.id === playerId);
-        if (idx === -1) return;
-        let newHP = sessionData[idx].hp + amount;
-        if (newHP < 0) newHP = 0; if (newHP > sessionData[idx].maxHp) newHP = sessionData[idx].maxHp;
-        sessionData[idx].hp = newHP;
-        localStorage.setItem(storageKey, JSON.stringify(sessionData));
-        updateUI();
+        if (conn && conn.open) {
+            conn.send({ type: 'ACTION', action: 'MODIFY_HP', playerId: playerId, amount: amount });
+        } else {
+            alert("Terputus dari GM!");
+        }
     }
 
     function addDeathSave(type) {
-        const sessionData = loadData();
-        const idx = sessionData.findIndex(p => p.id === playerId);
-        if (idx === -1) return;
-        
-        if(type === 'success' && sessionData[idx].deathSaves.success < 3) sessionData[idx].deathSaves.success++;
-        if(type === 'fail' && sessionData[idx].deathSaves.fail < 3) sessionData[idx].deathSaves.fail++;
-        
-        localStorage.setItem(storageKey, JSON.stringify(sessionData));
-        updateUI();
+        if (conn && conn.open) {
+            conn.send({ type: 'ACTION', action: 'DEATH_SAVE', playerId: playerId, saveType: type });
+        } else {
+            alert("Terputus dari GM!");
+        }
     }
-
-    updateUI();
-    window.addEventListener('storage', e => { if (e.key === storageKey) updateUI(); });
 </script>
 </body>
 </html>

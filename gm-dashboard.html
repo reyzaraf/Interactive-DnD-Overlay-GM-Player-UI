@@ -68,12 +68,13 @@
     <div class="grid-container" id="gmGrid"></div>
 
     <button class="btn-reset" onclick="resetAll()">Reset Semua Data</button>
-
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
-    const urlParams = new URLSearchParams(window.location.search);
+const urlParams = new URLSearchParams(window.location.search);
     const roomId = urlParams.get('room') || 'default';
-    const storageKey = 'dnd_session_data_' + roomId;
-    const sceneKey = 'dnd_scene_data_' + roomId;
+    const roomKey = 'dnd_session_' + roomId;
+    const sceneKey = 'dnd_scene_' + roomId;
+    const peerHostId = 'farka-dnd-' + roomId; // ID Server Unik
 
     const allConditions = ["Blinded", "Charmed", "Deafened", "Frightened", "Grappled", "Incapacitated", "Invisible", "Paralyzed", "Petrified", "Poisoned", "Prone", "Restrained", "Stunned", "Unconscious"];
 
@@ -82,36 +83,89 @@
         conditions: [], initiative: 0, isTurn: false, deathSaves: { success: 0, fail: 0 }
     }));
 
-    let sessionData = JSON.parse(localStorage.getItem(storageKey)) || defaultData;
+    let sessionData = JSON.parse(localStorage.getItem(roomKey)) || defaultData;
     sessionData = sessionData.map(p => ({ ...p, level: p.level || 1, conditions: p.conditions || [], initiative: p.initiative || 0, isTurn: p.isTurn || false, deathSaves: p.deathSaves || { success: 0, fail: 0 } }));
-    document.querySelector('h1').innerHTML = `D&D GM Dashboard <br><span style="font-size: 1rem; color: #bdc3c7;">Room: ${roomId}</span>`;
+
+    document.querySelector('h1').innerHTML = `D&D GM Dashboard <br><span style="font-size: 1rem; color: #f39c12;">⏳ Menyiapkan Server Room: ${roomId}...</span>`;
+
+    // ==========================================
+    // SISTEM PEER JS (SERVER HOST)
+    // ==========================================
+    const peer = new Peer(peerHostId);
+    let connectedClients = [];
+
+    peer.on('open', (id) => {
+        document.querySelector('h1').innerHTML = `D&D GM Dashboard <br><span style="font-size: 1rem; color: #2ecc71;">🌐 Server Online (Room: ${roomId})</span>`;
+    });
+
+    peer.on('error', (err) => {
+        document.querySelector('h1').innerHTML = `D&D GM Dashboard <br><span style="font-size: 1rem; color: #e74c3c;">❌ Error: Room sudah dipakai / Koneksi Gagal</span>`;
+        console.error(err);
+    });
+
+    peer.on('connection', (conn) => {
+        connectedClients.push(conn);
+        conn.on('open', () => {
+            // Kirim data lengkap saat klien baru masuk
+            const sceneData = JSON.parse(localStorage.getItem(sceneKey)) || {title: '', subtitle: ''};
+            conn.send({ type: 'SYNC', session: sessionData, scene: sceneData });
+        });
+        
+        // Mendengarkan perintah (klik) dari Player Controller
+        conn.on('data', (data) => {
+            if (data.type === 'ACTION') handlePlayerAction(data);
+        });
+
+        conn.on('close', () => {
+            connectedClients = connectedClients.filter(c => c.peer !== conn.peer);
+        });
+    });
+
+    // Penyiaran data ke semua layar (OBS & HP Pemain)
+    function broadcastState() {
+        const sceneData = JSON.parse(localStorage.getItem(sceneKey)) || {title: '', subtitle: ''};
+        const payload = { type: 'SYNC', session: sessionData, scene: sceneData };
+        connectedClients.forEach(c => { if(c.open) c.send(payload); });
+    }
+
+    // Memproses klik dari HP pemain
+    function handlePlayerAction(data) {
+        const idx = sessionData.findIndex(p => p.id === data.playerId);
+        if(idx === -1) return;
+
+        if (data.action === 'MODIFY_HP') {
+            let newHP = sessionData[idx].hp + data.amount;
+            if (newHP < 0) newHP = 0;
+            if (newHP > sessionData[idx].maxHp) newHP = sessionData[idx].maxHp;
+            sessionData[idx].hp = newHP;
+            if (newHP > 0) sessionData[idx].deathSaves = { success: 0, fail: 0 };
+        } else if (data.action === 'DEATH_SAVE') {
+            if(data.saveType === 'success' && sessionData[idx].deathSaves.success < 3) sessionData[idx].deathSaves.success++;
+            if(data.saveType === 'fail' && sessionData[idx].deathSaves.fail < 3) sessionData[idx].deathSaves.fail++;
+        }
+        saveData(); // Simpan dan otomatis siarkan
+    }
+    // ==========================================
 
     function updateSceneData() {
         const title = document.getElementById('sceneTitleInput').value;
         const sub = document.getElementById('sceneSubtitleInput').value;
         localStorage.setItem(sceneKey, JSON.stringify({ title: title, subtitle: sub }));
-        alert("Scene diperbarui!");
+        broadcastState(); alert("Scene diperbarui!");
     }
 
     function clearSceneData() {
         document.getElementById('sceneTitleInput').value = '';
         document.getElementById('sceneSubtitleInput').value = '';
         localStorage.setItem(sceneKey, JSON.stringify({ title: '', subtitle: '' }));
+        broadcastState();
     }
 
-    function openSceneOverlay() {
-        window.open(`scene-overlay.html?room=${roomId}`, '_blank');
-    }
-
+    function openSceneOverlay() { window.open(`scene-overlay.html?room=${roomId}`, '_blank'); }
     function copyPlayerLink(playerId) {
         const basePath = window.location.href.split('?')[0].replace('gm-dashboard.html', '');
         const link = `${basePath}player-controller.html?id=${playerId}&room=${roomId}`;
-        
-        navigator.clipboard.writeText(link).then(() => {
-            alert(`Link Player Controller untuk ID ${playerId} berhasil disalin!\nSilakan paste (Ctrl+V) ke pemain.`);
-        }).catch(err => {
-            alert(`Gagal menyalin link. Silakan copy manual:\n${link}`);
-        });
+        navigator.clipboard.writeText(link).then(() => alert(`Link disalin!`)).catch(() => alert(`Copy manual:\n${link}`));
     }
 
     const existingScene = JSON.parse(localStorage.getItem(sceneKey));
@@ -151,7 +205,6 @@
             card.innerHTML = `
                 <div style="position: absolute; top: 10px; right: 10px; background: #110d0a; border: 1px solid var(--gold-dark); padding: 2px 6px; border-radius: 4px; font-family: 'Cinzel', serif; font-size: 0.8rem; color: var(--gold-light);">ID: ${player.id}</div>
                 <h3>${player.isTurn ? '⚔️ ' : ''}Slot ${index + 1}</h3>
-                
                 <div style="display:flex; gap:10px;">
                     <div style="flex:1;">
                         <div class="form-group"><label>Nama</label><input type="text" value="${player.name}" onchange="updateData(${index}, 'name', this.value)" ${!player.active ? 'disabled' : ''}></div>
@@ -164,12 +217,10 @@
                         <div class="form-group"><label>Max HP</label><input type="number" value="${player.maxHp}" onchange="updateData(${index}, 'maxHp', this.value)" ${!player.active ? 'disabled' : ''}></div>
                     </div>
                 </div>
-
                 <div class="form-group">
                     <label>Curr HP</label>
                     <input type="number" value="${player.hp}" onchange="updateData(${index}, 'hp', this.value)" ${!player.active ? 'disabled' : ''} style="color: ${player.hp <= 0 ? '#e74c3c' : '#d4af37'};">
                 </div>
-                
                 <div class="form-group" style="align-items: flex-start;">
                     <label style="margin-top: 5px;">Kondisi</label>
                     <div class="condition-container">
@@ -177,80 +228,55 @@
                         <button class="btn-clear-cond" onclick="clearConditions(${index})" ${!player.active ? 'disabled' : ''}>Set Normal</button>
                     </div>
                 </div>
-
                 ${hpSectionHTML}
-
                 <button class="btn-overlay" onclick="window.open('player-overlay.html?id=${player.id}&room=${roomId}', '_blank')" ${!player.active ? 'disabled' : ''}>Buka Overlay Stream</button>
                 <button class="btn-copy" onclick="copyPlayerLink('${player.id}')" ${!player.active ? 'disabled' : ''}>🔗 Copy Link Player Controller</button>
                 <button class="btn-toggle" onclick="togglePlayer(${index})">${player.active ? 'Nonaktifkan Player' : 'Aktifkan Player'}</button>
             `;
             grid.appendChild(card);
         });
-        saveData();
     }
 
     function updateData(index, key, value) {
         sessionData[index][key] = (key === 'ac' || key === 'hp' || key === 'maxHp' || key === 'level' || key === 'initiative') ? parseInt(value) || 0 : value;
-        if (key === 'hp' && sessionData[index].hp > 0) {
-            sessionData[index].deathSaves = { success: 0, fail: 0 };
-        }
-        saveData(); renderDashboard(); 
+        if (key === 'hp' && sessionData[index].hp > 0) sessionData[index].deathSaves = { success: 0, fail: 0 };
+        saveData(); 
     }
 
-    function updateConditions(index, selectElement) {
-        sessionData[index].conditions = Array.from(selectElement.selectedOptions).map(opt => opt.value);
-        saveData(); renderDashboard();
-    }
-    function clearConditions(index) { sessionData[index].conditions = []; saveData(); renderDashboard(); }
-
+    function updateConditions(index, selectElement) { sessionData[index].conditions = Array.from(selectElement.selectedOptions).map(opt => opt.value); saveData(); }
+    function clearConditions(index) { sessionData[index].conditions = []; saveData(); }
     function modifyHP(index, amount) {
         let newHP = sessionData[index].hp + amount;
-        if (newHP < 0) newHP = 0;
-        if (newHP > sessionData[index].maxHp) newHP = sessionData[index].maxHp;
+        if (newHP < 0) newHP = 0; if (newHP > sessionData[index].maxHp) newHP = sessionData[index].maxHp;
         sessionData[index].hp = newHP;
         if (newHP > 0) sessionData[index].deathSaves = { success: 0, fail: 0 };
-        saveData(); renderDashboard();
+        saveData(); 
     }
 
-    function sortInitiative() {
-        sessionData.sort((a, b) => b.initiative - a.initiative);
-        saveData(); renderDashboard();
-    }
+    function sortInitiative() { sessionData.sort((a, b) => b.initiative - a.initiative); saveData(); }
 
     function nextTurn() {
         let currentIndex = sessionData.findIndex(p => p.isTurn && p.active);
         sessionData.forEach(p => p.isTurn = false);
-
         let nextIndex = currentIndex + 1;
         let found = false;
         for(let i=0; i<sessionData.length; i++) {
             if(nextIndex >= sessionData.length) nextIndex = 0;
-            if(sessionData[nextIndex].active && sessionData[nextIndex].hp > 0) {
-                sessionData[nextIndex].isTurn = true;
-                found = true; break;
-            }
+            if(sessionData[nextIndex].active && sessionData[nextIndex].hp > 0) { sessionData[nextIndex].isTurn = true; found = true; break; }
             nextIndex++;
         }
-        if(!found && sessionData.filter(p=>p.active).length > 0) {
-            sessionData[0].isTurn = true;
-        }
-        saveData(); renderDashboard();
+        if(!found && sessionData.filter(p=>p.active).length > 0) sessionData[0].isTurn = true;
+        saveData(); 
     }
 
-    function togglePlayer(index) { sessionData[index].active = !sessionData[index].active; saveData(); renderDashboard(); }
-    function saveData() { localStorage.setItem(storageKey, JSON.stringify(sessionData)); }
-    function resetAll() { if(confirm("Reset Room " + roomId + "?")) { sessionData = JSON.parse(JSON.stringify(defaultData)); saveData(); renderDashboard(); } }
+    function togglePlayer(index) { sessionData[index].active = !sessionData[index].active; saveData(); }
+    function resetAll() { if(confirm("Reset Room " + roomId + "?")) { sessionData = JSON.parse(JSON.stringify(defaultData)); saveData(); } }
 
-    // PENAMBAHAN BARU: EVENT LISTENER AGAR GM DASHBOARD SINKRON DENGAN PLAYER CONTROLLER
-    window.addEventListener('storage', function(e) {
-        if (e.key === storageKey) {
-            const freshData = localStorage.getItem(storageKey);
-            if (freshData) {
-                sessionData = JSON.parse(freshData);
-                renderDashboard();
-            }
-        }
-    });
+    function saveData() { 
+        localStorage.setItem(roomKey, JSON.stringify(sessionData)); 
+        broadcastState(); // Otomatis mengirim ke OBS dan Player saat GM ngerubah sesuatu
+        renderDashboard(); 
+    }
 
     renderDashboard();
 </script>

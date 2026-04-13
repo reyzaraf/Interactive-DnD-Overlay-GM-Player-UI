@@ -179,160 +179,114 @@
     </div>
 
 <script>
-    const urlParams = new URLSearchParams(window.location.search);
+   const urlParams = new URLSearchParams(window.location.search);
     const playerId = urlParams.get('id') || 'p1';
     const roomId = urlParams.get('room') || 'default';
-    const storageKey = 'dnd_session_data_' + roomId;
+    const peerHostId = 'farka-dnd-' + roomId;
     
     let previousHPs = {}; 
     let previousConditions = [];
     let audioCtx = null;
     let audioReady = false;
+    let isFirstLoad = true;
+
+    // ==========================================
+    // SISTEM PEER JS (KLIEN OBS)
+    // ==========================================
+    const peer = new Peer(); 
+    const errorMsg = document.getElementById('errorMsg');
+    errorMsg.innerText = "⏳ Menghubungkan ke GM (Room: " + roomId + ")...";
+    errorMsg.style.display = 'block';
+
+    peer.on('open', () => {
+        const conn = peer.connect(peerHostId);
+        conn.on('open', () => { errorMsg.style.display = 'none'; });
+        
+        conn.on('data', (msg) => {
+            if (msg.type === 'SYNC') updateUI(msg.session);
+        });
+
+        conn.on('close', () => {
+            errorMsg.innerText = "❌ Koneksi ke GM terputus.";
+            errorMsg.style.display = 'block';
+        });
+    });
+
+    peer.on('error', (err) => {
+        errorMsg.innerText = "❌ Gagal terhubung ke GM.";
+        errorMsg.style.display = 'block';
+    });
+    // ==========================================
 
     function initAudio() {
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
-        }
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
         audioReady = true;
         document.getElementById('audioInitOverlay').style.display = 'none'; 
         playSound('init');
     }
 
-    // Advanced Web Audio API untuk Suara Medieval
     function playSound(type) {
         if (!audioReady || !audioCtx) return; 
         if (audioCtx.state === 'suspended') audioCtx.resume();
         const time = audioCtx.currentTime;
         
         if (type === 'damage') {
-            // 1. Denting Logam Pedang (Square wave pitch drop)
-            const osc = audioCtx.createOscillator(); 
-            const oscGain = audioCtx.createGain();
-            osc.type = 'square'; 
-            osc.frequency.setValueAtTime(600, time);
-            osc.frequency.exponentialRampToValueAtTime(80, time + 0.2);
-            oscGain.gain.setValueAtTime(0.4, time);
-            oscGain.gain.exponentialRampToValueAtTime(0.01, time + 0.2);
-            osc.connect(oscGain);
-            oscGain.connect(audioCtx.destination);
-            osc.start(time);
-            osc.stop(time + 0.2);
-
-            // 2. Suara Gesekan / Ayunan (White Noise)
-            const bufferSize = audioCtx.sampleRate * 0.25;
-            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-            const data = buffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) { data[i] = Math.random() * 2 - 1; }
-            const noise = audioCtx.createBufferSource();
-            noise.buffer = buffer;
-            const noiseFilter = audioCtx.createBiquadFilter();
-            noiseFilter.type = 'highpass';
-            noiseFilter.frequency.value = 800;
-            const noiseGain = audioCtx.createGain();
-            noiseGain.gain.setValueAtTime(0.8, time);
-            noiseGain.gain.exponentialRampToValueAtTime(0.01, time + 0.25);
-            noise.connect(noiseFilter);
-            noiseFilter.connect(noiseGain);
-            noiseGain.connect(audioCtx.destination);
-            noise.start(time);
-
+            const osc = audioCtx.createOscillator(); const oscGain = audioCtx.createGain();
+            osc.type = 'square'; osc.frequency.setValueAtTime(600, time); osc.frequency.exponentialRampToValueAtTime(80, time + 0.2);
+            oscGain.gain.setValueAtTime(0.4, time); oscGain.gain.exponentialRampToValueAtTime(0.01, time + 0.2);
+            osc.connect(oscGain); oscGain.connect(audioCtx.destination); osc.start(time); osc.stop(time + 0.2);
+            const bufferSize = audioCtx.sampleRate * 0.25; const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) { data[i] = Math.random() * 2 - 1; }
+            const noise = audioCtx.createBufferSource(); noise.buffer = buffer; const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'highpass'; noiseFilter.frequency.value = 800; const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(0.8, time); noiseGain.gain.exponentialRampToValueAtTime(0.01, time + 0.25);
+            noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(audioCtx.destination); noise.start(time);
         } else if (type === 'heal') {
-            // Suara Sihir Lonceng (Arpeggio Sine waves)
-            const notes = [523.25, 659.25, 783.99, 1046.50]; // Chord C Major
+            const notes = [523.25, 659.25, 783.99, 1046.50]; 
             notes.forEach((freq, index) => {
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                osc.type = 'sine';
-                osc.frequency.value = freq;
-                const startTime = time + (index * 0.05);
-                gain.gain.setValueAtTime(0, startTime);
-                gain.gain.linearRampToValueAtTime(0.3, startTime + 0.05);
-                gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.6);
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start(startTime);
-                osc.stop(startTime + 0.6);
+                const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.type = 'sine'; osc.frequency.value = freq;
+                const startTime = time + (index * 0.05); gain.gain.setValueAtTime(0, startTime); gain.gain.linearRampToValueAtTime(0.3, startTime + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.6); osc.connect(gain); gain.connect(audioCtx.destination); osc.start(startTime); osc.stop(startTime + 0.6);
             });
-
         } else if (type === 'status') {
-            // Suara Efek Gelap/Kutukan (Lowpass Sawtooth)
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            const filter = audioCtx.createBiquadFilter();
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(120, time);
-            osc.frequency.linearRampToValueAtTime(60, time + 0.4);
-            filter.type = 'lowpass';
-            filter.frequency.setValueAtTime(600, time);
-            filter.frequency.linearRampToValueAtTime(100, time + 0.4);
-            gain.gain.setValueAtTime(0.4, time);
-            gain.gain.exponentialRampToValueAtTime(0.01, time + 0.4);
-            osc.connect(filter);
-            filter.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start(time);
-            osc.stop(time + 0.4);
-
+            const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); const filter = audioCtx.createBiquadFilter();
+            osc.type = 'sawtooth'; osc.frequency.setValueAtTime(120, time); osc.frequency.linearRampToValueAtTime(60, time + 0.4);
+            filter.type = 'lowpass'; filter.frequency.setValueAtTime(600, time); filter.frequency.linearRampToValueAtTime(100, time + 0.4);
+            gain.gain.setValueAtTime(0.4, time); gain.gain.exponentialRampToValueAtTime(0.01, time + 0.4); osc.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(time); osc.stop(time + 0.4);
         } else if (type === 'init') {
-            const osc = audioCtx.createOscillator(); 
-            const gain = audioCtx.createGain();
-            osc.type = 'sine'; 
-            osc.frequency.setValueAtTime(800, time);
-            gain.gain.setValueAtTime(0.1, time);
-            gain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
-            osc.connect(gain); gain.connect(audioCtx.destination);
-            osc.start(time); osc.stop(time + 0.1);
+            const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.type = 'sine'; osc.frequency.setValueAtTime(800, time);
+            gain.gain.setValueAtTime(0.1, time); gain.gain.exponentialRampToValueAtTime(0.01, time + 0.1); osc.connect(gain); gain.connect(audioCtx.destination); osc.start(time); osc.stop(time + 0.1);
         }
     }
-
-    // Fungsi Trigger Animasi Visual
+    
     function triggerDamageAnimation() {
-        const overlay = document.getElementById('playerOverlay');
-        const vContainer = document.getElementById('visualEffectsContainer');
-        
-        // Remove class if it's already there to restart animation
-        overlay.classList.remove('shake-anim');
-        void overlay.offsetWidth; // Trigger reflow
-        overlay.classList.add('shake-anim');
-        
-        const slash = document.createElement('div');
-        slash.className = 'slash-effect';
-        vContainer.appendChild(slash);
-        setTimeout(() => { 
-            overlay.classList.remove('shake-anim'); 
-            slash.remove(); 
-        }, 400);
+        const overlay = document.getElementById('playerOverlay'); const vContainer = document.getElementById('visualEffectsContainer');
+        overlay.classList.remove('shake-anim'); void overlay.offsetWidth; overlay.classList.add('shake-anim');
+        const slash = document.createElement('div'); slash.className = 'slash-effect'; vContainer.appendChild(slash);
+        setTimeout(() => { overlay.classList.remove('shake-anim'); slash.remove(); }, 400);
     }
 
     function triggerHealAnimation() {
-        const overlay = document.getElementById('playerOverlay');
-        const vContainer = document.getElementById('visualEffectsContainer');
-        
-        overlay.classList.remove('heal-anim');
-        void overlay.offsetWidth;
-        overlay.classList.add('heal-anim');
-        
-        const plus = document.createElement('div');
-        plus.className = 'heal-cross';
-        plus.innerText = '✚';
-        vContainer.appendChild(plus);
-        setTimeout(() => { 
-            overlay.classList.remove('heal-anim'); 
-            plus.remove(); 
-        }, 1000);
+        const overlay = document.getElementById('playerOverlay'); const vContainer = document.getElementById('visualEffectsContainer');
+        overlay.classList.remove('heal-anim'); void overlay.offsetWidth; overlay.classList.add('heal-anim');
+        const plus = document.createElement('div'); plus.className = 'heal-cross'; plus.innerText = '✚'; vContainer.appendChild(plus);
+        setTimeout(() => { overlay.classList.remove('heal-anim'); plus.remove(); }, 1000);
     }
 
-    function updateUI() {
-        const rawData = localStorage.getItem(storageKey);
-        if (!rawData) return;
-        const player = JSON.parse(rawData).find(p => p.id === playerId);
+    function triggerFloatingText(diff) {
+        const container = document.getElementById('visualEffectsContainer'); const el = document.createElement('div');
+        el.className = 'floating-text ' + (diff > 0 ? 'heal' : 'damage'); el.innerText = (diff > 0 ? '+' : '') + diff;
+        container.appendChild(el); setTimeout(() => el.remove(), 1500); 
+    }
+
+    function updateUI(sessionData) {
+        const player = sessionData.find(p => p.id === playerId);
         const overlay = document.getElementById('playerOverlay');
-        const errorMsg = document.getElementById('errorMsg');
-        if (!player || !player.active) { overlay.style.display = 'none'; errorMsg.style.display = 'block'; return; }
-        overlay.style.display = 'block'; errorMsg.style.display = 'none';
+        
+        if (!player || !player.active) { overlay.style.display = 'none'; return; }
+        overlay.style.display = 'block';
 
         document.getElementById('uiName').innerText = player.name;
         document.getElementById('uiClass').innerText = player.className;
@@ -344,16 +298,10 @@
         const prevHP = previousHPs[playerId];
         const currentHP = player.hp;
         
-        // Logika Suara, Teks Melayang, dan Animasi
-        if (prevHP !== undefined && prevHP !== currentHP) {
+        if (!isFirstLoad && prevHP !== undefined && prevHP !== currentHP) {
             triggerFloatingText(currentHP - prevHP);
-            if(currentHP < prevHP) {
-                playSound('damage');
-                triggerDamageAnimation();
-            } else {
-                playSound('heal');
-                triggerHealAnimation();
-            }
+            if(currentHP < prevHP) { playSound('damage'); triggerDamageAnimation(); } 
+            else { playSound('heal'); triggerHealAnimation(); }
         }
         previousHPs[playerId] = currentHP; 
 
@@ -375,71 +323,33 @@
             let hpPercent = (currentHP / player.maxHp) * 100;
             const hpBar = document.getElementById('uiHpBar');
             hpBar.style.width = hpPercent + '%';
-            if (hpPercent <= 25) {
-                hpBar.style.background = 'linear-gradient(to bottom, #8a0303 0%, #300000 100%)'; 
-                overlay.classList.add('critical-glow'); 
-            } else {
-                hpBar.style.background = 'linear-gradient(to bottom, var(--hp-red-light) 0%, var(--hp-red) 50%, #4a0000 100%)';
-                overlay.classList.remove('critical-glow');
-            }
+            if (hpPercent <= 25) { hpBar.style.background = 'linear-gradient(to bottom, #8a0303 0%, #300000 100%)'; overlay.classList.add('critical-glow'); } 
+            else { hpBar.style.background = 'linear-gradient(to bottom, var(--hp-red-light) 0%, var(--hp-red) 50%, #4a0000 100%)'; overlay.classList.remove('critical-glow'); }
         }
 
-        // Cek jika ada Kondisi/Status Effect baru
         const condBox = document.getElementById('uiConditions');
         const currentConditions = player.conditions || [];
         
-        // Deteksi apakah ada item baru di array conditions
         let hasNewCondition = false;
-        if (currentConditions.length > previousConditions.length) {
-            hasNewCondition = true;
-        } else {
-            // Cek apakah isinya beda
-            for (let i = 0; i < currentConditions.length; i++) {
-                if (!previousConditions.includes(currentConditions[i])) {
-                    hasNewCondition = true; break;
-                }
-            }
+        if (!isFirstLoad) {
+            if (currentConditions.length > previousConditions.length) { hasNewCondition = true; } 
+            else { for (let i = 0; i < currentConditions.length; i++) { if (!previousConditions.includes(currentConditions[i])) { hasNewCondition = true; break; } } }
         }
 
-        if (hasNewCondition) {
-            playSound('status'); // Mainkan suara thud/kutukan
-        }
+        if (hasNewCondition) playSound('status'); 
 
         condBox.innerHTML = ''; 
         currentConditions.forEach(cond => {
             const badge = document.createElement('div');
-            // Jika statusnya baru, tambahkan kelas animasi pop-up
-            if (!previousConditions.includes(cond)) {
-                badge.className = `condition-badge pop-anim`;
-            } else {
-                badge.className = `condition-badge`;
-            }
+            if (!isFirstLoad && !previousConditions.includes(cond)) badge.className = `condition-badge pop-anim`;
+            else badge.className = `condition-badge`;
             badge.innerText = cond;
             condBox.appendChild(badge);
         });
 
         previousConditions = currentConditions;
+        isFirstLoad = false;
     }
-
-    function triggerFloatingText(diff) {
-        const container = document.getElementById('visualEffectsContainer');
-        const el = document.createElement('div');
-        el.className = 'floating-text ' + (diff > 0 ? 'heal' : 'damage');
-        el.innerText = (diff > 0 ? '+' : '') + diff;
-        container.appendChild(el);
-        setTimeout(() => el.remove(), 1500); 
-    }
-
-    const initRaw = localStorage.getItem(storageKey);
-    if(initRaw) { 
-        const initP = JSON.parse(initRaw).find(p => p.id === playerId); 
-        if(initP) {
-            previousHPs[playerId] = initP.hp; 
-            previousConditions = initP.conditions || [];
-        }
-    }
-    updateUI(); 
-    window.addEventListener('storage', e => { if (e.key === storageKey) updateUI(); });
 </script>
 </body>
 </html>

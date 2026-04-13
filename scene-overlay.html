@@ -31,24 +31,30 @@
 <script>
     const urlParams = new URLSearchParams(window.location.search);
     const roomId = urlParams.get('room') || 'default';
-    const sceneKey = 'dnd_scene_data_' + roomId;
+    const peerHostId = 'farka-dnd-' + roomId;
 
-    function updateScene() {
-        const rawData = localStorage.getItem(sceneKey);
+    const peer = new Peer(); 
+    
+    peer.on('open', () => {
+        const conn = peer.connect(peerHostId);
+        conn.on('data', (msg) => {
+            if (msg.type === 'SYNC') {
+                updateScene(msg.scene);
+            }
+        });
+    });
+
+    function updateScene(data) {
         const banner = document.getElementById('sceneBanner');
-        if (!rawData) { banner.classList.add('hidden'); return; }
-        
-        const data = JSON.parse(rawData);
-        if (!data.title && !data.subtitle) {
-            banner.classList.add('hidden'); return;
+        if (!data || (!data.title && !data.subtitle)) {
+            banner.classList.add('hidden');
+            return;
         }
         
         banner.classList.remove('hidden');
         document.getElementById('sceneTitle').innerText = data.title;
         document.getElementById('sceneSubtitle').innerText = data.subtitle;
     }
-    updateScene();
-    window.addEventListener('storage', e => { if (e.key === sceneKey) updateScene(); });
 </script>
 </body>
 </html>
