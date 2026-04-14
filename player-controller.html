@@ -7,26 +7,32 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Cormorant+Garamond:wght@600&display=swap');
         :root { --gold-light: #d4af37; --gold-dark: #8b7348; --bg-texture: linear-gradient(135deg, #1c140d 0%, #0a0705 100%); --panel-bg: linear-gradient(145deg, #2a2118, #1a140f); }
-        body { font-family: 'Cormorant Garamond', serif; background: var(--bg-texture); color: #dcdde1; margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .remote-container { background: var(--panel-bg); width: 100%; max-width: 400px; border-radius: 8px; padding: 25px; border: 3px solid #5c4a2e; text-align: center; position: relative; box-shadow: 0 15px 30px rgba(0,0,0,0.9); transition: all 0.5s; }
-        .remote-container.is-dying { background: #300000; border-color: #ff3333; box-shadow: inset 0 0 50px rgba(255,0,0,0.5); }
-        .header h1 { margin: 0; color: var(--gold-light); font-family: 'Cinzel', serif; font-size: 2rem; }
-        .header p { margin: 5px 0 20px 0; color: #bdc3c7; font-size: 1.2rem; font-style: italic; }
-        .turn-badge { display:none; background:#f1c40f; color:#000; font-family:'Cinzel',serif; font-weight:bold; padding:5px 15px; border-radius:20px; margin-bottom:15px; }
-        .stat-box { background: #110d0a; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid var(--gold-dark); }
-        .stat-box h2 { margin: 0; font-family: 'Cinzel', serif; font-size: 3.5rem; color: #ff4757; }
-        .controls-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        button { padding: 15px; font-size: 1.2rem; font-family: 'Cinzel', serif; font-weight: bold; border-radius: 8px; cursor: pointer; color: white; border: none; box-shadow: 0 4px 8px rgba(0,0,0,0.5); }
-        .btn-dmg-large { background: linear-gradient(to bottom, #8a0303, #4a0000); border: 2px solid #ff3333; }
-        .btn-heal-large { background: linear-gradient(to bottom, #1e5631, #0a2e15); border: 2px solid #4caf50; }
-        .death-controls { display: none; margin-top: 20px; }
-        .is-dying .death-controls { display: block; }
-        .is-dying .controls-grid { display: none; }
-        #pinOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-texture); z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        body { font-family: 'Cormorant Garamond', serif; background: var(--bg-texture); color: #dcdde1; margin: 0; padding: 10px; display: flex; justify-content: center; min-height: 100vh; }
+        .remote-container { background: var(--panel-bg); width: 100%; max-width: 450px; border-radius: 8px; padding: 20px; border: 3px solid #5c4a2e; box-shadow: 0 15px 30px rgba(0,0,0,0.9); }
+        .remote-container.is-dying { background: #300000; border-color: #ff3333; }
+        
+        /* Tab System */
+        .tab-menu { display: flex; gap: 5px; margin-bottom: 20px; border-bottom: 2px solid var(--gold-dark); }
+        .tab-btn { flex: 1; padding: 10px; background: #110d0a; border: none; color: #888; font-family: 'Cinzel'; cursor: pointer; border-radius: 5px 5px 0 0; }
+        .tab-btn.active { background: var(--gold-dark); color: white; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .stat-box { background: #110d0a; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid var(--gold-dark); text-align: center; }
+        .stat-box h2 { margin: 0; font-family: 'Cinzel'; font-size: 2.5rem; color: #ff4757; }
+        
+        .controls-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        button { padding: 12px; font-family: 'Cinzel'; font-weight: bold; border-radius: 6px; cursor: pointer; color: white; border: none; }
+        .btn-dmg { background: linear-gradient(to bottom, #8a0303, #4a0000); }
+        .btn-heal { background: linear-gradient(to bottom, #1e5631, #0a2e15); }
+        
+        /* List Inputs */
+        textarea, input { width: 100%; padding: 10px; background: #000; border: 1px solid var(--gold-dark); color: #fff; box-sizing: border-box; border-radius: 4px; margin-bottom: 10px; font-family: inherit; }
+        .log-box { background: rgba(0,0,0,0.5); padding: 10px; border-radius: 4px; height: 100px; overflow-y: auto; font-size: 0.9rem; border: 1px solid #333; margin-top: 10px; }
+        .log-entry { border-bottom: 1px solid #222; padding: 3px 0; color: #aaa; }
+        
+        #pinOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-texture); z-index: 100; display: flex; justify-content: center; align-items: center; }
         .pin-box { background: var(--panel-bg); padding: 30px; border-radius: 8px; border: 2px solid var(--gold-dark); text-align: center; }
-        .pin-box input { width: 100%; padding: 10px; font-size: 1.5rem; text-align: center; background: #000; color: var(--gold-light); border: 1px solid var(--gold-dark); margin: 15px 0; }
-        #errorMsg { color: #ff4757; font-weight: bold; margin-bottom: 10px; display: none; }
-        #loadingMsg { color: var(--gold-light); font-family: 'Cinzel'; }
     </style>
 </head>
 <body>
@@ -34,37 +40,60 @@
     <div id="pinOverlay" style="display: none;">
         <div class="pin-box">
             <h2 style="font-family: 'Cinzel'; color: var(--gold-light);">Keamanan Sesi</h2>
-            <p id="pinInstruction">Masukkan PIN untuk mengontrol karakter</p>
-            <input type="password" id="inputPin" placeholder="PIN">
-            <button class="btn-heal-large" style="width: 100%;" onclick="validatePin()">Masuk Sesi</button>
+            <input type="password" id="inputPin" placeholder="PIN" style="text-align:center; font-size:1.5rem;">
+            <button class="btn-heal" style="width: 100%;" onclick="validatePin()">Masuk</button>
         </div>
     </div>
 
     <div class="remote-container" id="remoteController" style="display: none;">
-        <div id="loadingMsg">⏳ Mengamankan Slot...</div>
-        <div class="turn-badge" id="turnBadge">🔥 GILIRANMU! 🔥</div>
-        <div class="header">
-            <h1 id="ctrlName">---</h1>
-            <p>Lv. <span id="ctrlLevel">-</span> | AC <span id="ctrlAC">-</span></p>
+        <div style="text-align:center; margin-bottom:10px;">
+            <h1 id="ctrlName" style="margin:0; font-family:'Cinzel'; color:var(--gold-light);">---</h1>
+            <div id="turnBadge" style="display:none; color:#f1c40f; font-weight:bold;">🔥 GILIRANMU! 🔥</div>
         </div>
-        <div class="stat-box" id="hpBox">
-            <div id="hpLabel">Current HP</div>
-            <h2><span id="ctrlCurrentHP">0</span> <span style="font-size:1.5rem; color:#888;">/ <span id="ctrlMaxHP">0</span></span></h2>
+
+        <div class="tab-menu">
+            <button class="tab-btn active" onclick="openTab('combat')">Combat</button>
+            <button class="tab-btn" onclick="openTab('skills')">Skills</button>
+            <button class="tab-btn" onclick="openTab('inv')">Inv</button>
         </div>
-        <div class="controls-grid">
-            <button class="btn-dmg-large" onclick="modifyHP(-5)">-5 HP</button>
-            <button class="btn-heal-large" onclick="modifyHP(5)">+5 HP</button>
-            <button class="btn-dmg-large" onclick="modifyHP(-1)">-1 HP</button>
-            <button class="btn-heal-large" onclick="modifyHP(1)">+1 HP</button>
-        </div>
-        <div class="death-controls">
-            <h3 style="color:#ff3333; font-family:'Cinzel', serif;">DEATH SAVES</h3>
-            <div style="margin-bottom: 10px;">
-                <span style="color:#2ecc71">S: <span id="dsSuccScore">0</span></span> | 
-                <span style="color:#e74c3c">G: <span id="dsFailScore">0</span></span>
+
+        <div id="combat" class="tab-content active">
+            <div class="stat-box">
+                <div id="hpLabel">HP</div>
+                <h2><span id="ctrlCurrentHP">0</span> / <span id="ctrlMaxHP">0</span></h2>
+                <div style="font-size:0.9rem; color:var(--gold-light);">AC: <span id="ctrlAC">10</span> | Exhaust: <span id="ctrlExh">0</span></div>
             </div>
-            <button class="btn-ds-succ" style="background: #2ecc71" onclick="addDeathSave('success')">Roll Sukses</button>
-            <button class="btn-ds-fail" style="background: #c0392b" onclick="addDeathSave('fail')">Roll Gagal</button>
+
+            <div class="controls-grid" id="hpButtons">
+                <button class="btn-dmg" onclick="modifyHP(-5)">-5 HP</button>
+                <button class="btn-heal" onclick="modifyHP(5)">+5 HP</button>
+                <button class="btn-dmg" onclick="modifyHP(-1)">-1 HP</button>
+                <button class="btn-heal" onclick="modifyHP(1)">+1 HP</button>
+            </div>
+
+            <div id="deathSaves" class="stat-box" style="display:none; border-color:#ff3333;">
+                <h3 style="color:#ff3333; margin:0;">DEATH SAVES</h3>
+                <div style="margin:10px 0;">S: <span id="dsSucc">0</span> | G: <span id="dsFail">0</span></div>
+                <button class="btn-heal" style="width:45%; background:#2ecc71" onclick="addDeathSave('success')">SUCCESS</button>
+                <button class="btn-dmg" style="width:45%; background:#c0392b" onclick="addDeathSave('fail')">FAIL</button>
+            </div>
+
+            <div class="log-box" id="combatLog">
+                <div class="log-entry">Menunggu log aksi...</div>
+            </div>
+        </div>
+
+        <div id="skills" class="tab-content">
+            <h3 style="font-family:'Cinzel'; margin-top:0;">Catatan Skill / Mantra</h3>
+            <textarea id="skillNotes" rows="12" placeholder="Contoh: 
+- Fireball (3/3 slots)
+- Sneak Attack (2d6)" onchange="updateSkills()"></textarea>
+        </div>
+
+        <div id="inv" class="tab-content">
+            <h3 style="font-family:'Cinzel'; margin-top:0;">Harta & Barang</h3>
+            <div class="form-group"><label>Gold</label><input type="number" id="invGold" value="0" onchange="updateInv()"></div>
+            <textarea id="invItems" rows="10" placeholder="List barang bawaan..." onchange="updateInv()"></textarea>
         </div>
     </div>
 
@@ -75,130 +104,111 @@
         const roomId = urlParams.get('room') || 'default';
         const playerId = urlParams.get('id') || 'p1';
         const urlKey = urlParams.get('key') || '';
-        
-        let myPin = "";
-        if (urlKey) { try { myPin = atob(urlKey); } catch(e) {} }
+        let myPin = urlKey ? atob(urlKey) : "";
 
         const syncTopic = 'campaign-dnd-room-' + roomId + '/sync';
         const actionTopic = 'campaign-dnd-room-' + roomId + '/action';
-        const playerGuardTopic = 'campaign-dnd-room-' + roomId + '/guard/' + playerId;
+        const guardTopic = 'campaign-dnd-room-' + roomId + '/guard/' + playerId;
 
-        // PERBAIKAN: Gunakan sessionStorage agar ID tetap sama setelah refresh
-        let myInstanceId = sessionStorage.getItem('dnd_instance_id_' + roomId + '_' + playerId);
-        if (!myInstanceId) {
-            myInstanceId = Math.random().toString(36).substr(2, 9);
-            sessionStorage.setItem('dnd_instance_id_' + roomId + '_' + playerId, myInstanceId);
-        }
+        let myInstanceId = sessionStorage.getItem('dnd_instance_id_'+roomId+'_'+playerId) || Math.random().toString(36).substr(2,9);
+        sessionStorage.setItem('dnd_instance_id_'+roomId+'_'+playerId, myInstanceId);
 
         const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
         let sessionDataCache = null;
         let isSlotOwner = false;
 
-        if (!myPin) {
-            document.getElementById('pinOverlay').style.display = 'flex';
-        } else {
-            document.getElementById('remoteController').style.display = 'block';
-        }
+        if (!myPin) document.getElementById('pinOverlay').style.display = 'flex';
+        else document.getElementById('remoteController').style.display = 'block';
 
         client.on('connect', () => {
             client.subscribe(syncTopic);
-            client.subscribe(playerGuardTopic);
-            
-            // Cek apakah slot sudah ada pemiliknya
-            client.publish(playerGuardTopic, JSON.stringify({ type: 'PLAYER_CHECK', id: myInstanceId }));
-            
-            setTimeout(() => {
-                if (!isSlotOwner) {
-                    isSlotOwner = true;
-                    document.getElementById('loadingMsg').innerText = "Sesi Terhubung.";
-                    requestSync();
-                }
-            }, 1000);
+            client.subscribe(guardTopic);
+            client.publish(guardTopic, JSON.stringify({ type: 'PLAYER_CHECK', id: myInstanceId }));
+            setTimeout(() => { if (!isSlotOwner) { isSlotOwner = true; requestSync(); } }, 1000);
         });
 
         client.on('message', (topic, message) => {
             const data = JSON.parse(message.toString());
-
-            if (topic === playerGuardTopic) {
-                // Hanya respon jika ID berbeda (artinya benar-benar perangkat/sesi lain)
-                if (data.id !== myInstanceId) {
-                    if (data.type === 'PLAYER_CHECK' && isSlotOwner) {
-                        client.publish(playerGuardTopic, JSON.stringify({ type: 'PLAYER_OCCUPIED', id: myInstanceId }));
-                    } else if (data.type === 'PLAYER_OCCUPIED') {
-                        alert("SLOT INI SEDANG DIGUNAKAN DI TAB ATAU PERANGKAT LAIN!");
-                        window.location.href = 'index.html';
-                    }
-                }
-                return;
+            if (topic === guardTopic && data.id !== myInstanceId) {
+                if (data.type === 'PLAYER_CHECK' && isSlotOwner) client.publish(guardTopic, JSON.stringify({ type: 'PLAYER_OCCUPIED', id: myInstanceId }));
+                else if (data.type === 'PLAYER_OCCUPIED') { alert("Slot terpakai!"); window.location.href = 'index.html'; }
             }
-
-            if (topic === syncTopic) {
-                if (!myPin) return;
-                if (data.pin !== myPin) {
-                    document.getElementById('pinInstruction').innerText = "PIN Salah!";
-                    document.getElementById('pinOverlay').style.display = 'flex';
-                    document.getElementById('remoteController').style.display = 'none';
-                    return;
-                }
+            if (topic === syncTopic && data.pin === myPin) {
                 sessionDataCache = data.session;
                 updateUI();
             }
         });
 
-        window.validatePin = function() {
-            const input = document.getElementById('inputPin').value;
-            if (input) {
-                myPin = input;
-                document.getElementById('pinOverlay').style.display = 'none';
-                document.getElementById('remoteController').style.display = 'block';
-                requestSync();
-            }
+        window.openTab = function(tabName) {
+            document.querySelectorAll('.tab-content, .tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            event.currentTarget.classList.add('active');
         };
 
-        function requestSync() {
-            if (client.connected && myPin && isSlotOwner) {
-                client.publish(actionTopic, JSON.stringify({ type: 'REQUEST_SYNC', pin: myPin }));
-            }
-        }
+        window.validatePin = function() {
+            myPin = document.getElementById('inputPin').value;
+            document.getElementById('pinOverlay').style.display = 'none';
+            document.getElementById('remoteController').style.display = 'block';
+            requestSync();
+        };
+
+        function requestSync() { if(client.connected && myPin) client.publish(actionTopic, JSON.stringify({ type: 'REQUEST_SYNC', pin: myPin })); }
 
         function updateUI() {
-            if (!sessionDataCache || !isSlotOwner) return;
-            const player = sessionDataCache.find(p => p.id === playerId);
-            if (!player || !player.active) {
-                document.getElementById('loadingMsg').innerText = "Player belum aktif di Dashboard GM";
-                document.getElementById('loadingMsg').style.display = 'block';
-                return;
-            }
+            const p = sessionDataCache.find(x => x.id === playerId);
+            if (!p || !p.active) return;
 
-            document.getElementById('loadingMsg').style.display = 'none';
-            document.getElementById('ctrlName').innerText = player.name;
-            document.getElementById('ctrlCurrentHP').innerText = player.hp;
-            document.getElementById('ctrlMaxHP').innerText = player.maxHp;
-            document.getElementById('ctrlAC').innerText = player.ac;
-            document.getElementById('ctrlLevel').innerText = player.level;
-            document.getElementById('turnBadge').style.display = player.isTurn ? 'block' : 'none';
-            
+            document.getElementById('ctrlName').innerText = p.name;
+            document.getElementById('ctrlCurrentHP').innerText = p.hp;
+            document.getElementById('ctrlMaxHP').innerText = p.maxHp;
+            document.getElementById('ctrlAC').innerText = p.ac;
+            document.getElementById('ctrlExh').innerText = p.exhaustion;
+            document.getElementById('turnBadge').style.display = p.isTurn ? 'block' : 'none';
+
+            // Sync Skill & Inv jika sedang tidak fokus mengetik
+            if (document.activeElement !== document.getElementById('skillNotes')) document.getElementById('skillNotes').value = p.skills.join('\n');
+            if (document.activeElement !== document.getElementById('invGold')) document.getElementById('invGold').value = p.inventory.gold;
+            if (document.activeElement !== document.getElementById('invItems')) document.getElementById('invItems').value = p.inventory.items;
+
             const remote = document.getElementById('remoteController');
-            if (player.hp <= 0 && player.maxHp > 0) { remote.classList.add('is-dying'); } 
-            else { remote.classList.remove('is-dying'); }
-            
-            if (player.deathSaves) {
-                document.getElementById('dsSuccScore').innerText = player.deathSaves.success;
-                document.getElementById('dsFailScore').innerText = player.deathSaves.fail;
+            if (p.hp <= 0 && p.maxHp > 0) {
+                remote.classList.add('is-dying');
+                document.getElementById('hpButtons').style.display = 'none';
+                document.getElementById('deathSaves').style.display = 'block';
+                document.getElementById('dsSucc').innerText = p.deathSaves.success;
+                document.getElementById('dsFail').innerText = p.deathSaves.fail;
+            } else {
+                remote.classList.remove('is-dying');
+                document.getElementById('hpButtons').style.display = 'grid';
+                document.getElementById('deathSaves').style.display = 'none';
             }
         }
 
-        window.modifyHP = function(amt) {
-            if (client.connected && myPin && isSlotOwner) {
-                client.publish(actionTopic, JSON.stringify({ type: 'ACTION', action: 'MODIFY_HP', playerId, amount: amt, pin: myPin }));
-            }
+        window.modifyHP = function(a) {
+            client.publish(actionTopic, JSON.stringify({ type: 'ACTION', action: 'MODIFY_HP', playerId, amount: a, pin: myPin }));
+            addLog(a > 0 ? `Heal +${a} HP` : `Damage ${a} HP`);
         };
 
-        window.addDeathSave = function(type) {
-            if (client.connected && myPin && isSlotOwner) {
-                client.publish(actionTopic, JSON.stringify({ type: 'ACTION', action: 'DEATH_SAVE', playerId, saveType: type, pin: myPin }));
-            }
+        window.addDeathSave = function(t) {
+            client.publish(actionTopic, JSON.stringify({ type: 'ACTION', action: 'DEATH_SAVE', playerId, saveType: t, pin: myPin }));
+            addLog(`Death Save: ${t.toUpperCase()}`);
         };
+
+        window.updateSkills = function() {
+            const skills = document.getElementById('skillNotes').value.split('\n');
+            client.publish(actionTopic, JSON.stringify({ type: 'ACTION', action: 'UPDATE_SKILLS', playerId, skills, pin: myPin }));
+        };
+
+        window.updateInv = function() {
+            const inventory = { gold: parseInt(document.getElementById('invGold').value), items: document.getElementById('invItems').value };
+            client.publish(actionTopic, JSON.stringify({ type: 'ACTION', action: 'UPDATE_INV', playerId, inventory, pin: myPin }));
+        };
+
+        function addLog(msg) {
+            const box = document.getElementById('combatLog');
+            const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            box.innerHTML = `<div class="log-entry">[${time}] ${msg}</div>` + box.innerHTML;
+        }
     });
 </script>
 </body>

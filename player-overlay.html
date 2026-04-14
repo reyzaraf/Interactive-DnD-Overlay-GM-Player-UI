@@ -6,115 +6,132 @@
     <title>RPG Player Overlay</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Cormorant+Garamond:ital,wght@0,600;1,600&display=swap');
-        :root { --gold-light: #f1c40f; --gold-dark: #b8860b; --hp-red: #8a0303; --hp-red-light: #ff3333; --bg-texture: linear-gradient(135deg, #1c140d 0%, #0a0705 100%); }
-        body { margin: 0; padding: 20px; background-color: transparent; overflow: hidden; }
+        :root { 
+            --gold-light: #f1c40f; 
+            --gold-dark: #b8860b; 
+            --hp-red: #8a0303; 
+            --hp-red-light: #ff3333; 
+            --bg-texture: linear-gradient(135deg, #1c140d 0%, #0a0705 100%);
+            --exhaust-color: #e67e22;
+        }
+        /* PERBAIKAN OBS: Menghilangkan centering agar elemen diam di pojok kiri atas. 
+           Padding 20px dibiarkan agar efek glow (box-shadow) tidak terpotong pinggiran OBS */
+        body { margin: 0; padding: 35px 25px 25px 25px; background-color: transparent; overflow: hidden; display: inline-block; width: max-content; }
         
-        #audioInitOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; justify-content: center; align-items: center; cursor: pointer; backdrop-filter: blur(5px); }
-        .btn-audio { background: linear-gradient(to bottom, #b86704, #7a4100); color: white; border: 2px solid #f39c12; padding: 15px 30px; font-family: 'Cinzel', serif; font-size: 1.2rem; font-weight: bold; border-radius: 8px; text-align: center; text-shadow: 1px 1px 3px #000; box-shadow: 0 5px 15px rgba(0,0,0,0.8); animation: pulse-btn 1.5s infinite; }
-        @keyframes pulse-btn { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-
-        .overlay-container { width: 340px; background: var(--bg-texture); border: 3px solid #5c4a2e; border-top-color: #8b7348; border-left-color: #8b7348; border-radius: 4px; padding: 18px; box-shadow: 0 10px 20px rgba(0,0,0,0.9); position: relative; transition: border-color 0.3s, box-shadow 0.3s; }
-        .overlay-container::before { content: ''; position: absolute; top: -6px; left: -6px; right: -6px; bottom: -6px; border: 1px solid #c5a059; pointer-events: none; opacity: 0.5; z-index: 1;}
-        .overlay-container.active-turn { border-color: #f1c40f; box-shadow: 0 0 25px rgba(241, 196, 15, 0.8), inset 0 0 15px rgba(241, 196, 15, 0.3); transform: scale(1.02); }
-        .turn-indicator { display: none; position: absolute; top: -15px; left: 50%; transform: translateX(-50%); background: #f1c40f; color: #000; font-family: 'Cinzel', serif; font-weight: bold; padding: 2px 10px; border-radius: 10px; font-size: 0.8rem; box-shadow: 0 2px 5px rgba(0,0,0,0.8); z-index: 5;}
-        .active-turn .turn-indicator { display: block; }
+        .overlay-container { 
+            width: 340px; background: var(--bg-texture); border: 3px solid #5c4a2e; 
+            border-top-color: #8b7348; border-left-color: #8b7348; border-radius: 4px; 
+            padding: 18px; box-shadow: 0 10px 20px rgba(0,0,0,0.9); position: relative; 
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); opacity: 0; margin: 0;
+        }
+        .overlay-container::after { content: ''; position: absolute; top: -6px; left: -6px; right: -6px; bottom: -6px; border: 1px solid #c5a059; pointer-events: none; opacity: 0.3; }
+        
+        .overlay-container.active-turn { border-color: #f1c40f; box-shadow: 0 0 25px rgba(241, 196, 15, 0.6); transform: translateY(-5px); }
+        .turn-indicator { display: none; position: absolute; top: -15px; left: 50%; transform: translateX(-50%); background: #f1c40f; color: #000; font-family: 'Cinzel', serif; font-weight: bold; padding: 2px 12px; border-radius: 10px; font-size: 0.75rem; z-index: 5; }
+        .active-turn .turn-indicator { display: block; animation: bounce 2s infinite; }
+        @keyframes bounce { 0%, 100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, -5px); } }
 
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #3d2e18; padding-bottom: 10px; position: relative; z-index: 2; }
         .char-info { flex-grow: 1; }
         .char-info h2 { margin: 0 0 2px 0; font-family: 'Cinzel', serif; font-size: 1.4rem; color: var(--gold-light); text-shadow: 2px 2px 4px #000; }
         .char-info p { margin: 0; font-family: 'Cormorant Garamond', serif; font-size: 1.1rem; color: #dcdde1; font-style: italic; }
-        .ac-badge { background: radial-gradient(circle, #5e4726 0%, #2a1f11 100%); border: 2px solid var(--gold-dark); border-radius: 50%; width: 48px; height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.9); }
+        
+        .ac-badge { background: radial-gradient(circle, #5e4726 0%, #2a1f11 100%); border: 2px solid var(--gold-dark); border-radius: 50%; width: 50px; height: 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.9); }
         .ac-label { font-family: 'Cinzel', serif; font-size: 0.6rem; color: var(--gold-dark); margin-bottom: -2px; }
-        .ac-value { font-family: 'Cinzel', serif; font-size: 1.2rem; color: #fff; font-weight: bold; text-shadow: 1px 1px 2px #000; }
+        .ac-value { font-family: 'Cinzel', serif; font-size: 1.3rem; color: #fff; font-weight: bold; text-shadow: 1px 1px 2px #000; }
         
         .hp-section { position: relative; z-index: 2;}
-        .hp-text { font-family: 'Cinzel', serif; position: absolute; width: 100%; text-align: center; line-height: 26px; font-size: 1.1rem; font-weight: bold; color: #fff; text-shadow: 1px 1px 3px #000; z-index: 2; }
-        .hp-bar-bg { width: 100%; height: 26px; background: #111; border: 2px solid #3d2b1f; border-radius: 3px; position: relative; overflow: hidden; }
-        .hp-bar-fill { height: 100%; background: linear-gradient(to bottom, var(--hp-red-light) 0%, var(--hp-red) 50%, #4a0000 100%); border-top: 1px solid #ff9999; transition: width 0.4s ease-out; }
-        
-        .death-saves-section { display: none; text-align: center; padding: 5px 0; position: relative; z-index: 2;}
-        .ds-row { display: flex; justify-content: space-around; align-items: center; margin-bottom: 5px; }
-        .ds-label { font-family: 'Cinzel', serif; font-size: 0.9rem; font-weight: bold; width: 60px; text-shadow: 1px 1px 2px #000; }
-        .ds-label.succ { color: #2ecc71; }
-        .ds-label.fail { color: #e74c3c; }
-        .ds-circles { display: flex; gap: 8px; }
-        .circle { width: 15px; height: 15px; border-radius: 50%; border: 2px solid #8b7348; background: #111; box-shadow: inset 0 2px 4px rgba(0,0,0,0.8); transition: all 0.3s; }
-        .circle.s-fill { background: radial-gradient(circle, #2ecc71, #145a32); border-color: #2ecc71; box-shadow: 0 0 8px #2ecc71; }
-        .circle.f-fill { background: radial-gradient(circle, #e74c3c, #78281f); border-color: #e74c3c; box-shadow: 0 0 8px #e74c3c; }
+        .hp-bar-bg { width: 100%; height: 26px; background: #000; border: 2px solid #3d2b1f; border-radius: 3px; position: relative; overflow: hidden; margin-bottom: 8px; }
+        .hp-bar-fill { height: 100%; background: linear-gradient(to bottom, var(--hp-red-light) 0%, var(--hp-red) 50%, #4a0000 100%); transition: width 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .hp-text { font-family: 'Cinzel', serif; position: absolute; top: 0; left: 0; width: 100%; text-align: center; line-height: 26px; font-size: 1rem; color: #fff; text-shadow: 1px 1px 2px #000; font-weight: bold; z-index: 2; }
+
+        .extra-stats { display: flex; justify-content: space-around; font-family: 'Cinzel', serif; font-size: 0.8rem; margin-top: 10px; padding-top: 10px; border-top: 1px solid #3d2e18; position: relative; z-index: 2; }
+        .stat-item { color: var(--gold-dark); text-shadow: 1px 1px 2px #000;}
+        .stat-item span { color: #fff; font-size: 1rem; font-weight: bold; }
+        .exhaustion-glow { color: var(--exhaust-color) !important; text-shadow: 0 0 10px var(--exhaust-color); animation: pulse-exh 2s infinite; }
+        @keyframes pulse-exh { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+        .death-saves-section { display: none; text-align: center; padding: 5px 0; position: relative; z-index: 2; }
+        .ds-circles { display: flex; gap: 8px; justify-content: center; margin-top: 5px; }
+        .circle { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #8b7348; background: #111; box-shadow: inset 0 2px 4px rgba(0,0,0,0.8); transition: all 0.3s; }
+        .circle.s-fill { background: #2ecc71; border-color: #2ecc71; box-shadow: 0 0 10px #2ecc71; }
+        .circle.f-fill { background: #e74c3c; border-color: #e74c3c; box-shadow: 0 0 10px #e74c3c; }
 
         @keyframes pulse-critical { 0% { box-shadow: inset 0 0 10px #ff0000; } 50% { box-shadow: inset 0 0 30px #ff0000; } 100% { box-shadow: inset 0 0 10px #ff0000; } }
         .critical-glow { animation: pulse-critical 1.5s infinite; }
 
         #visualEffectsContainer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; overflow: hidden; border-radius: 4px; }
-        .floating-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-family: 'Cinzel', serif; font-size: 2.8rem; font-weight: bold; text-shadow: 3px 3px 6px #000; animation: floatUp 1.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; opacity: 0; }
-        .floating-text.damage { color: #ff3333; } 
-        .floating-text.heal { color: #4caf50; }
-        @keyframes floatUp { 0% { transform: translate(-50%, -30%); opacity: 1; } 100% { transform: translate(-50%, -150%); opacity: 0; } }
+        .floating-text { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-family: 'Cinzel', serif; font-size: 3rem; font-weight: bold; animation: floatUp 1.2s ease-out forwards; }
+        .floating-text.damage { color: #ff3333; text-shadow: 0 0 15px #000; }
+        .floating-text.heal { color: #2ecc71; text-shadow: 0 0 15px #000; }
+        @keyframes floatUp { 0% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -100px); } }
 
-        @keyframes shake { 0% { transform: translate(1px, 1px) rotate(0deg); } 10% { transform: translate(-1px, -2px) rotate(-1deg); } 20% { transform: translate(-3px, 0px) rotate(1deg); } 30% { transform: translate(3px, 2px) rotate(0deg); } 40% { transform: translate(1px, -1px) rotate(1deg); } 50% { transform: translate(-1px, 2px) rotate(-1deg); } 60% { transform: translate(-3px, 1px) rotate(0deg); } 70% { transform: translate(3px, 1px) rotate(-1deg); } 80% { transform: translate(-1px, -1px) rotate(1deg); } 90% { transform: translate(1px, 2px) rotate(0deg); } 100% { transform: translate(0px, 0px) rotate(0deg); } }
+        @keyframes shake { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 20% { transform: translate(-3px, 0px) rotate(1deg); } 40% { transform: translate(1px, -1px) rotate(-1deg); } 60% { transform: translate(-3px, 1px) rotate(0deg); } 80% { transform: translate(2px, 1px) rotate(-1deg); } }
         .shake-anim { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
 
         .slash-effect { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, transparent 45%, rgba(255,0,0,0.8) 50%, transparent 55%); opacity: 0; pointer-events: none; mix-blend-mode: screen; animation: slash-anim 0.3s cubic-bezier(0.1, 0.9, 0.2, 1) forwards; }
         @keyframes slash-anim { 0% { transform: scale(1.5) translate(-20px, -20px); opacity: 1; } 100% { transform: scale(1) translate(0, 0); opacity: 0; } }
 
-        @keyframes heal-glow { 0% { box-shadow: 0 0 0 rgba(46, 204, 113, 0); border-color: #5c4a2e; } 50% { box-shadow: 0 0 30px rgba(46, 204, 113, 1), inset 0 0 20px rgba(46, 204, 113, 0.5); border-color: #2ecc71; } 100% { box-shadow: 0 0 0 rgba(46, 204, 113, 0); border-color: #5c4a2e; } }
+        @keyframes heal-glow { 0%, 100% { box-shadow: 0 0 0 rgba(46, 204, 113, 0); border-color: #5c4a2e; } 50% { box-shadow: 0 0 30px rgba(46, 204, 113, 1), inset 0 0 20px rgba(46, 204, 113, 0.5); border-color: #2ecc71; } }
         .heal-anim { animation: heal-glow 1s ease-out forwards; }
 
         .heal-cross { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 5rem; color: rgba(46, 204, 113, 0.8); text-shadow: 0 0 20px #2ecc71; opacity: 0; pointer-events: none; animation: float-up-fade 1s ease-out forwards; }
         @keyframes float-up-fade { 0% { transform: translate(-50%, -30%) scale(0.5); opacity: 1; } 100% { transform: translate(-50%, -80%) scale(1.2); opacity: 0; } }
 
-        #uiConditions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; justify-content: center; position: relative; z-index: 2;}
-        .condition-badge { font-family: 'Cinzel', serif; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; color: #fff; border: 1px solid rgba(255,255,255,0.3); background: #555; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
-        
-        @keyframes status-pop { 0% { transform: scale(0.5); opacity: 0; } 70% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
-        .pop-anim { animation: status-pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        #uiConditions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; justify-content: center; position: relative; z-index: 2; }
+        .condition-badge { font-family: 'Cinzel', serif; font-size: 0.65rem; padding: 2px 6px; border-radius: 3px; background: #444; color: white; border: 1px solid #666; animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes pop { 0% { transform: scale(0); } 100% { transform: scale(1); } }
 
         #errorMsg { display: none; color: #e74c3c; font-family: 'Cinzel', serif; font-weight: bold; text-align: center; background: rgba(0,0,0,0.8); padding: 10px; border: 1px solid #e74c3c; }
     </style>
 </head>
 <body>
 
-    <div id="audioInitOverlay" onclick="initAudio()">
-        <div class="btn-audio">
-            🔊 KLIK UNTUK AKTIFKAN SUARA<br>
-            <span style="font-size: 0.8rem; font-family: sans-serif; font-weight: normal;">(Dibutuhkan oleh browser)</span>
-        </div>
-    </div>
-
-    <div id="errorMsg">Menunggu Data...</div>
+    <div id="errorMsg">Menunggu Data GM...</div>
 
     <div class="overlay-container" id="playerOverlay">
         <div class="turn-indicator">ACTIVE TURN</div>
         <div id="visualEffectsContainer"></div>
+        
         <div class="header">
             <div class="char-info">
                 <h2 id="uiName">Loading...</h2>
-                <p>Lv. <span id="uiLevel">1</span> <span id="uiClass">Loading...</span></p>
+                <p>Lv. <span id="uiLevel">1</span> <span id="uiClass">Class</span></p>
             </div>
             <div class="ac-badge"><span class="ac-label">AC</span><span class="ac-value" id="uiAC">10</span></div>
         </div>
 
         <div class="hp-section" id="hpSection">
-            <div class="hp-text"><span id="uiCurrentHP">0</span> / <span id="uiMaxHP">0</span></div>
-            <div class="hp-bar-bg"><div class="hp-bar-fill" id="uiHpBar"></div></div>
+            <div class="hp-bar-bg">
+                <div class="hp-text"><span id="uiCurrentHP">0</span> / <span id="uiMaxHP">0</span></div>
+                <div class="hp-bar-fill" id="uiHpBar" style="width: 0%;"></div>
+            </div>
         </div>
 
         <div class="death-saves-section" id="dsSection">
-            <div class="ds-row">
-                <span class="ds-label succ">SUKSES</span>
-                <div class="ds-circles" id="uiSuccCircles">
-                    <div class="circle"></div><div class="circle"></div><div class="circle"></div>
+            <div style="color:#e74c3c; font-family:'Cinzel'; font-size:0.8rem; font-weight:bold; text-shadow:1px 1px 2px #000;">DEATH SAVES</div>
+            <div style="display:flex; justify-content:space-around; margin-top:5px;">
+                <div>
+                    <span style="color:#2ecc71; font-family:'Cinzel'; font-size:0.7rem;">SUKSES</span>
+                    <div class="ds-circles" id="uiSuccCircles">
+                        <div class="circle"></div><div class="circle"></div><div class="circle"></div>
+                    </div>
                 </div>
-            </div>
-            <div class="ds-row">
-                <span class="ds-label fail">GAGAL</span>
-                <div class="ds-circles" id="uiFailCircles">
-                    <div class="circle"></div><div class="circle"></div><div class="circle"></div>
+                <div>
+                    <span style="color:#e74c3c; font-family:'Cinzel'; font-size:0.7rem;">GAGAL</span>
+                    <div class="ds-circles" id="uiFailCircles">
+                        <div class="circle"></div><div class="circle"></div><div class="circle"></div>
+                    </div>
                 </div>
             </div>
         </div>
 
         <div id="uiConditions"></div>
+
+        <div class="extra-stats">
+            <div class="stat-item">INIT: <span id="uiInit">0</span></div>
+            <div class="stat-item">EXHAUST: <span id="uiExh">0</span></div>
+        </div>
     </div>
 
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
@@ -123,46 +140,40 @@
         const urlParams = new URLSearchParams(window.location.search);
         const playerId = urlParams.get('id') || 'p1';
         const roomId = urlParams.get('room') || 'default';
+        const urlKey = urlParams.get('key') || '';
+        const myPin = urlKey ? atob(urlKey) : "";
         
         const syncTopic = 'campaign-dnd-room-' + roomId + '/sync';
-        const actionTopic = 'campaign-dnd-room-' + roomId + '/action';    
+        const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+        
         let previousHPs = {}; 
         let previousConditions = [];
-        let audioCtx = null;
-        let audioReady = false;
         let isFirstLoad = true;
+
+        let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let audioReady = true;
 
         const errorMsg = document.getElementById('errorMsg');
         errorMsg.innerText = "⏳ Menghubungkan ke Relay EMQX...";
         errorMsg.style.display = 'block';
 
-        // Ganti ke Broker EMQX
-        const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
-
         client.on('connect', () => {
             errorMsg.style.display = 'none';
             client.subscribe(syncTopic);
-            client.publish(actionTopic, JSON.stringify({ type: 'REQUEST_SYNC' }));
         });
 
         client.on('message', (topic, message) => {
             if (topic === syncTopic) {
                 const data = JSON.parse(message.toString());
-                updateUI(data.session);
+                if (data.pin === myPin) {
+                    updateUI(data.session);
+                }
             }
         });
 
-        window.initAudio = function() {
-            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            audioReady = true;
-            document.getElementById('audioInitOverlay').style.display = 'none'; 
-            playSound('init');
-        };
-
         function playSound(type) {
             if (!audioReady || !audioCtx) return; 
-            if (audioCtx.state === 'suspended') audioCtx.resume();
+            if (audioCtx.state === 'suspended') { audioCtx.resume(); }
             const time = audioCtx.currentTime;
             
             if (type === 'damage') {
@@ -189,9 +200,6 @@
                 filter.type = 'lowpass'; filter.frequency.setValueAtTime(600, time); filter.frequency.linearRampToValueAtTime(100, time + 0.4);
                 gain.gain.setValueAtTime(0.4, time); gain.gain.exponentialRampToValueAtTime(0.01, time + 0.4); osc.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
                 osc.start(time); osc.stop(time + 0.4);
-            } else if (type === 'init') {
-                const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.type = 'sine'; osc.frequency.setValueAtTime(800, time);
-                gain.gain.setValueAtTime(0.1, time); gain.gain.exponentialRampToValueAtTime(0.01, time + 0.1); osc.connect(gain); gain.connect(audioCtx.destination); osc.start(time); osc.stop(time + 0.1);
             }
         }
         
@@ -218,17 +226,29 @@
         function updateUI(sessionData) {
             const player = sessionData.find(p => p.id === playerId);
             const overlay = document.getElementById('playerOverlay');
-            if (!player || !player.active) { overlay.style.display = 'none'; return; }
-            overlay.style.display = 'block';
+            
+            if (!player || !player.active) { 
+                overlay.style.opacity = '0'; 
+                return; 
+            }
+            overlay.style.opacity = '1';
 
             document.getElementById('uiName').innerText = player.name;
             document.getElementById('uiClass').innerText = player.className;
             document.getElementById('uiLevel').innerText = player.level; 
             document.getElementById('uiAC').innerText = player.ac;
+            document.getElementById('uiInit').innerText = player.initiative;
+            
+            const exhEl = document.getElementById('uiExh');
+            exhEl.innerText = player.exhaustion || 0;
+            if (player.exhaustion > 0) exhEl.classList.add('exhaustion-glow');
+            else exhEl.classList.remove('exhaustion-glow');
+
             if(player.isTurn) overlay.classList.add('active-turn'); else overlay.classList.remove('active-turn');
 
             const prevHP = previousHPs[playerId];
             const currentHP = player.hp;
+            
             if (!isFirstLoad && prevHP !== undefined && prevHP !== currentHP) {
                 triggerFloatingText(currentHP - prevHP);
                 if(currentHP < prevHP) { playSound('damage'); triggerDamageAnimation(); } 
@@ -260,12 +280,15 @@
 
             const condBox = document.getElementById('uiConditions');
             const currentConditions = player.conditions || [];
+            
             let hasNewCondition = false;
             if (!isFirstLoad) {
                 if (currentConditions.length > previousConditions.length) { hasNewCondition = true; } 
                 else { for (let i = 0; i < currentConditions.length; i++) { if (!previousConditions.includes(currentConditions[i])) { hasNewCondition = true; break; } } }
             }
+
             if (hasNewCondition) playSound('status'); 
+
             condBox.innerHTML = ''; 
             currentConditions.forEach(cond => {
                 const badge = document.createElement('div');
@@ -274,6 +297,7 @@
                 badge.innerText = cond;
                 condBox.appendChild(badge);
             });
+
             previousConditions = currentConditions;
             isFirstLoad = false;
         }

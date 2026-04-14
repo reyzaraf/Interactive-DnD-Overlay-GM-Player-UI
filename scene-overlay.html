@@ -3,22 +3,135 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scene Banner Overlay</title>
+    <title>RPG Cinematic Scene Overlay - Readable Version</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Cormorant+Garamond:wght@600&display=swap');
-        body { margin: 0; padding: 20px; background: transparent; overflow: hidden; display: flex; justify-content: center; }
-        .banner-container { background: linear-gradient(145deg, #2a2118, #1a140f); border: 3px solid #8b7348; box-shadow: 0 10px 30px rgba(0,0,0,0.9), inset 0 0 20px rgba(0,0,0,0.8); border-radius: 4px; padding: 15px 40px; text-align: center; min-width: 400px; position: relative; }
-        .banner-container::before { content: ''; position: absolute; top: -6px; left: -6px; right: -6px; bottom: -6px; border: 1px solid #c5a059; pointer-events: none; opacity: 0.5; }
-        h1 { margin: 0; font-family: 'Cinzel', serif; font-size: 2rem; color: #d4af37; text-shadow: 2px 2px 4px #000; letter-spacing: 2px; }
-        p { margin: 5px 0 0 0; font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; color: #e74c3c; font-weight: bold; }
-        .hidden { display: none !important; }
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Cormorant+Garamond:wght@700&display=swap');
+        
+        /* --- OBS LAYOUT SETUP (TOP-CENTERED) --- */
+        body { 
+            margin: 0; 
+            padding: 0; 
+            background: transparent; 
+            overflow: hidden; 
+            display: flex; 
+            justify-content: center; /* Rata Tengah Horizontal */
+            align-items: flex-start; /* Rata Atas */
+            height: 100vh; 
+            width: 100vw;
+        }
+        
+        .scene-main-container {
+            padding-top: 40px; /* Jarak dari tepi atas OBS */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            width: max-content;
+        }
+
+        /* --- THE CLEAN MEDIEVAL PLAQUE --- */
+        .rpg-plaque {
+            /* Latar belakang gelap solid agar teks putih menonjol */
+            background: linear-gradient(145deg, #1a140f, #0a0705);
+            
+            /* Bingkai Logam Simpel */
+            border: 4px solid #4a3b2a;
+            outline: 2px solid #1a140f; /* Garis tepi luar agar lebih tegas */
+            
+            border-radius: 2px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.9);
+            
+            padding: 20px 60px;
+            position: relative;
+            min-width: 450px;
+            text-align: center;
+            
+            /* Animasi Muncul dari Atas */
+            transform: translateY(-120%);
+            opacity: 0;
+            transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+        .rpg-plaque.show { transform: translateY(0); opacity: 1; }
+
+        /* Ornamen Sudut (Rivet) - Dijaga tetap ada agar kesan medieval tidak hilang */
+        .rivet {
+            position: absolute; width: 8px; height: 8px; border-radius: 50%;
+            background: #5c4a2e;
+            box-shadow: inset -1px -1px 2px rgba(0,0,0,0.8);
+        }
+        .rivet-tl { top: 8px; left: 8px; }
+        .rivet-tr { top: 8px; right: 8px; }
+        .rivet-bl { bottom: 8px; left: 8px; }
+        .rivet-br { bottom: 8px; right: 8px; }
+
+        /* --- TEKS STYLING (FOKUS READABILITY) --- */
+        
+        .label-text {
+            font-family: 'Cinzel', serif; 
+            font-weight: 700; 
+            font-size: 0.85rem;
+            letter-spacing: 3px; 
+            color: #bdc3c7; /* Warna abu-abu perak agar tenang */
+            text-transform: uppercase;
+            margin-bottom: 5px;
+            display: block;
+            text-shadow: 2px 2px 2px #000;
+        }
+
+        .value-text {
+            font-family: 'Cormorant Garamond', serif; 
+            font-weight: 700; 
+            font-size: 2.8rem;
+            margin: 0;
+            color: #ffffff; /* Putih bersih agar sangat kontras */
+            line-height: 1.1;
+            /* Shadow hitam tebal agar terbaca di background apapun */
+            text-shadow: 
+                -2px -2px 0 #000,  
+                 2px -2px 0 #000,
+                -2px  2px 0 #000,
+                 2px  2px 0 #000,
+                 0 5px 10px rgba(0,0,0,0.8);
+            white-space: nowrap;
+        }
+
+        /* --- DINAMIS COLOR (OPSIONAL: Garis Bawah Saja) --- */
+        .map-box { border-top: 4px solid #d4af37; } /* Aksen Emas tipis di atas */
+        .boss-box { border-top: 4px solid #c0392b; display: none; } /* Aksen Merah tipis di atas */
+        
+        .boss-box.show { 
+            display: block; 
+            animation: dropIn 0.6s cubic-bezier(0.23, 1, 0.32, 1) forwards; 
+        }
+
+        @keyframes dropIn { 
+            0% { transform: translateY(-120%); opacity: 0; } 
+            100% { transform: translateY(0); opacity: 1; } 
+        }
+
     </style>
 </head>
 <body>
-    <div class="banner-container hidden" id="sceneBanner">
-        <h1 id="sceneTitle">Loading...</h1>
-        <p id="sceneSubtitle">Loading...</p>
+    
+    <div class="scene-main-container">
+        
+        <div class="rpg-plaque map-box" id="mapBox">
+            <div class="rivet rivet-tl"></div><div class="rivet rivet-tr"></div>
+            <div class="rivet rivet-bl"></div><div class="rivet rivet-br"></div>
+            
+            <span class="label-text">📍 LOKASI</span>
+            <h1 class="value-text" id="mapName">Memuat...</h1>
+        </div>
+        
+        <div class="rpg-plaque boss-box" id="bossBox">
+            <div class="rivet rivet-tl"></div><div class="rivet rivet-tr"></div>
+            <div class="rivet rivet-bl"></div><div class="rivet rivet-br"></div>
+            
+            <span class="label-text">💀 TARGET</span>
+            <h1 class="value-text" id="bossName">Memuat...</h1>
+        </div>
     </div>
+
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -26,31 +139,53 @@
         const roomId = urlParams.get('room') || 'default';
         const syncTopic = 'campaign-dnd-room-' + roomId + '/sync';
         const actionTopic = 'campaign-dnd-room-' + roomId + '/action';
+        const urlKey = urlParams.get('key') || '';
+        const myPin = urlKey ? atob(urlKey) : "";
 
-        // Ganti ke Broker EMQX
         const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
 
         client.on('connect', () => {
+            console.log('Overlay Connected');
             client.subscribe(syncTopic);
-            client.publish(actionTopic, JSON.stringify({ type: 'REQUEST_SYNC' }));
+            if (myPin) {
+                client.publish(actionTopic, JSON.stringify({ type: 'REQUEST_SYNC', pin: myPin }));
+            }
         });
 
         client.on('message', (topic, message) => {
             if (topic === syncTopic) {
-                const data = JSON.parse(message.toString());
-                updateScene(data.scene);
+                try {
+                    const data = JSON.parse(message.toString());
+                    if (data.pin === myPin) {
+                        updateScene(data.scene);
+                    }
+                } catch (e) { console.error(e); }
             }
         });
 
         function updateScene(data) {
-            const banner = document.getElementById('sceneBanner');
+            const mapBox = document.getElementById('mapBox');
+            const bossBox = document.getElementById('bossBox');
+            
             if (!data || (!data.title && !data.subtitle)) {
-                banner.classList.add('hidden');
+                mapBox.classList.remove('show');
+                bossBox.classList.remove('show');
                 return;
             }
-            banner.classList.remove('hidden');
-            document.getElementById('sceneTitle').innerText = data.title;
-            document.getElementById('sceneSubtitle').innerText = data.subtitle;
+
+            if (data.title) {
+                document.getElementById('mapName').innerText = data.title;
+                mapBox.classList.add('show');
+            } else {
+                mapBox.classList.remove('show');
+            }
+
+            if (data.subtitle) {
+                document.getElementById('bossName').innerText = data.subtitle;
+                setTimeout(() => bossBox.classList.add('show'), 200);
+            } else {
+                bossBox.classList.remove('show');
+            }
         }
     });
 </script>
